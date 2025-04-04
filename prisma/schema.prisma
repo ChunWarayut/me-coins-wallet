@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  NORMAL
+  PREMIUM
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PURCHASE
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ItemRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum DepositStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  username        String
+  email           String            @unique
+  role            UserRole
+  balance         Float
+  avatar          String
+  createdAt       DateTime          @default(now())
+  Transaction     Transaction[]
+  DepositRequest  DepositRequest[]
+  WithdrawRequest WithdrawRequest[]
+  sentGifts       Gift[]            @relation("SentGifts")
+  receivedGifts   Gift[]            @relation("ReceivedGifts")
+}
+
+model Transaction {
+  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String            @db.ObjectId
+  user      User              @relation(fields: [userId], references: [id])
+  amount    Float
+  type      TransactionType
+  status    TransactionStatus
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  slipImage String? // Optional, only for DEPOSIT
+}
+
+model Item {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String
+  price       Float
+  image       String
+  category    String
+  rarity      ItemRarity
+  Gift        Gift[]
+}
+
+model DepositRequest {
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String        @db.ObjectId
+  user      User          @relation(fields: [userId], references: [id])
+  username  String
+  amount    Float
+  slipImage String
+  status    DepositStatus
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model WithdrawRequest {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String         @db.ObjectId
+  user      User           @relation(fields: [userId], references: [id])
+  username  String
+  amount    Float
+  status    WithdrawStatus
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model Gift {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  senderId    String   @db.ObjectId
+  recipientId String   @db.ObjectId
+  itemId      String?  @db.ObjectId
+  amount      Float? // optional for item-based gift
+  message     String
+  createdAt   DateTime @default(now())
+
+  sender    User  @relation("SentGifts", fields: [senderId], references: [id])
+  recipient User  @relation("ReceivedGifts", fields: [recipientId], references: [id])
+  item      Item? @relation(fields: [itemId], references: [id])
+}
