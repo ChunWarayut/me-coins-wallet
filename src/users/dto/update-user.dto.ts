@@ -1,10 +1,9 @@
-
 import { IsEnum, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 enum UserRole {
   ADMIN = 'ADMIN',
-  USER = 'USER',
+  NORMAL = 'NORMAL',
   PREMIUM = 'PREMIUM',
 }
 

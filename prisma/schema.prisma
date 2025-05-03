@@ -14,7 +14,7 @@ model User {
   password      String
   username      String        @unique
   avatar        String
-  role          UserRole      @default(USER)
+  role          UserRole      @default(NORMAL)
   wallet        Wallet?
   deposits      Deposit[]
   withdrawals   Withdrawal[]
@@ -31,7 +31,7 @@ model User {
 
 enum UserRole {
   ADMIN
-  USER
+  NORMAL
   PREMIUM
 }
 

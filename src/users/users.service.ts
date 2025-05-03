@@ -20,7 +20,7 @@ export class UsersService {
   }
 
   async findById(id: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -29,8 +29,17 @@ export class UsersService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        wallet: {
+          select: {
+            balance: true,
+          },
+        },
       },
     });
+    return {
+      ...user,
+      balance: user?.wallet?.balance,
+    };
   }
 
   async findByEmail(email: string) {

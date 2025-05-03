@@ -27,7 +27,7 @@ async function main() {
       username: 'johndoe',
       email: 'john@example.com',
       password: hashedPassword,
-      role: UserRole.USER,
+      role: UserRole.NORMAL,
       discordId: '543063777101217802',
       wallet: {
         create: {
@@ -59,6 +59,7 @@ async function main() {
       where: { id: user.id },
       update: {
         discordId: user.discordId,
+        role: user.role,
       },
       create: user,
     });

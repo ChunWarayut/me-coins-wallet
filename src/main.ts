@@ -12,8 +12,8 @@ async function bootstrap() {
 
   // Setup Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('CoinNexus API')
-    .setDescription('API documentation for the CoinNexus platform')
+    .setTitle('MeCoins API')
+    .setDescription('API documentation for the MeCoins platform')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

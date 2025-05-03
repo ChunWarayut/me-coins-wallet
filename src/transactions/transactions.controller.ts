@@ -50,6 +50,7 @@ export class TransactionsController {
     @Param('id') id: string,
     @Body() updateStatusDto: UpdateRequestStatusDto,
   ): Promise<Deposit> {
+    console.log(updateStatusDto);
     return this.transactionsService.updateDepositStatus(
       id,
       updateStatusDto.status,

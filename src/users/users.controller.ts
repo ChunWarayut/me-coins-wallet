@@ -10,7 +10,8 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-
+import { GetUser } from '../auth/get-user.decorator';
+import { User } from '@prisma/client';
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
@@ -24,6 +25,18 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Return all users' })
   async getAllUsers() {
     return this.usersService.findAll();
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current user' })
+  @ApiResponse({ status: 200, description: 'Return the current user' })
+  async getCurrentUser(@GetUser() user: User) {
+    console.log('user', user);
+    console.log('user.id', user.id);
+
+    return this.usersService.findById(user.id);
   }
 
   @Get(':id')

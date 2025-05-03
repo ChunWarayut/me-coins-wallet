@@ -53,7 +53,14 @@ export class TransactionsService {
   }
 
   async getDepositRequests(): Promise<Deposit[]> {
-    return this.prisma.deposit.findMany();
+    return this.prisma.deposit.findMany({
+      where: {
+        status: 'PENDING',
+      },
+      include: {
+        user: true,
+      },
+    });
   }
 
   async updateDepositStatus(
@@ -79,6 +86,9 @@ export class TransactionsService {
         type: TransactionType.DEPOSIT,
         depositId: deposit.id,
       });
+      await this.discordService.notifyDepositApproval(deposit);
+    } else if (status === RequestStatus.REJECTED) {
+      await this.discordService.notifyDepositRejection(deposit);
     }
 
     return deposit;
@@ -147,6 +157,27 @@ export class TransactionsService {
     depositId?: string;
     withdrawalId?: string;
   }): Promise<Transaction> {
+    // First, ensure the user has a wallet
+    const wallet = await this.prisma.wallet.upsert({
+      where: { userId: data.userId },
+      create: {
+        userId: data.userId,
+        balance: 0,
+      },
+      update: {},
+    });
+
+    // Update wallet balance
+    const newBalance =
+      data.type === TransactionType.DEPOSIT
+        ? wallet.balance + data.amount
+        : wallet.balance - data.amount;
+
+    await this.prisma.wallet.update({
+      where: { id: wallet.id },
+      data: { balance: newBalance },
+    });
+
     return this.prisma.transaction.create({
       data: {
         amount: data.amount,
@@ -154,7 +185,7 @@ export class TransactionsService {
         status: 'COMPLETED',
         wallet: {
           connect: {
-            id: data.userId,
+            id: wallet.id,
           },
         },
         user: {
