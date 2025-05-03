@@ -7,29 +7,98 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  discordId     String?       @unique
+  email         String        @unique
+  password      String
+  username      String        @unique
+  avatar        String
+  role          UserRole      @default(USER)
+  wallet        Wallet?
+  deposits      Deposit[]
+  withdrawals   Withdrawal[]
+  purchases     Purchase[]
+  sentGifts     Gift[]        @relation("SentGifts")
+  receivedGifts Gift[]        @relation("ReceivedGifts")
+  ownedItems    OwnedItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  Transaction   Transaction[]
+
+  @@map("users")
+}
+
 enum UserRole {
   ADMIN
-  NORMAL
+  USER
   PREMIUM
+}
+
+model Wallet {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  balance      Float         @default(0)
+  userId       String        @unique @db.ObjectId
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id           String            @id @default(auto()) @map("_id") @db.ObjectId
+  amount       Float
+  type         TransactionType
+  status       TransactionStatus @default(PENDING)
+  slipImage    String?
+  userId       String            @db.ObjectId
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId     String            @db.ObjectId
+  wallet       Wallet            @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  depositId    String?           @unique @db.ObjectId
+  deposit      Deposit?          @relation(fields: [depositId], references: [id])
+  withdrawalId String?           @unique @db.ObjectId
+  withdrawal   Withdrawal?       @relation(fields: [withdrawalId], references: [id])
+  purchaseId   String?           @unique @db.ObjectId
+  purchase     Purchase?         @relation(fields: [purchaseId], references: [id])
+  giftId       String?           @unique @db.ObjectId
+  gift         Gift?             @relation(fields: [giftId], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@map("transactions")
 }
 
 enum TransactionType {
   DEPOSIT
   WITHDRAWAL
   PURCHASE
+  GIFT
 }
 
 enum TransactionStatus {
   PENDING
-  APPROVED
-  REJECTED
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
-enum ItemRarity {
-  COMMON
-  RARE
-  EPIC
-  LEGENDARY
+model Deposit {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  amount      Float
+  slipImage   String
+  status      DepositStatus @default(PENDING)
+  rate        Float         @default(1.0)
+  userId      String        @db.ObjectId
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  comment     String?
+
+  @@map("deposits")
 }
 
 enum DepositStatus {
@@ -38,83 +107,92 @@ enum DepositStatus {
   REJECTED
 }
 
-enum WithdrawStatus {
+model Withdrawal {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  amount      Float
+  status      WithdrawalStatus @default(PENDING)
+  userId      String           @db.ObjectId
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  comment     String?
+
+  @@map("withdrawals")
+}
+
+enum WithdrawalStatus {
   PENDING
   APPROVED
   REJECTED
 }
 
-model User {
-  id              String            @id @default(auto()) @map("_id") @db.ObjectId
-  username        String
-  email           String            @unique
-  role            UserRole
-  balance         Float
-  avatar          String
-  createdAt       DateTime          @default(now())
-  Transaction     Transaction[]
-  DepositRequest  DepositRequest[]
-  WithdrawRequest WithdrawRequest[]
-  sentGifts       Gift[]            @relation("SentGifts")
-  receivedGifts   Gift[]            @relation("ReceivedGifts")
-}
-
-model Transaction {
-  id        String            @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String            @db.ObjectId
-  user      User              @relation(fields: [userId], references: [id])
-  amount    Float
-  type      TransactionType
-  status    TransactionStatus
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  slipImage String? // Optional, only for DEPOSIT
-}
-
 model Item {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String
   price       Float
-  image       String
-  category    String
-  rarity      ItemRarity
-  Gift        Gift[]
+  imageUrl    String?
+  ownedItems  OwnedItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("items")
 }
 
-model DepositRequest {
-  id        String        @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String        @db.ObjectId
-  user      User          @relation(fields: [userId], references: [id])
-  username  String
-  amount    Float
-  slipImage String
-  status    DepositStatus
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+model OwnedItem {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String     @db.ObjectId
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    String     @db.ObjectId
+  item      Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  isGifted  Boolean    @default(false)
+  purchases Purchase[]
+  gifts     Gift[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("owned_items")
 }
 
-model WithdrawRequest {
-  id        String         @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String         @db.ObjectId
-  user      User           @relation(fields: [userId], references: [id])
-  username  String
-  amount    Float
-  status    WithdrawStatus
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+model Purchase {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @db.ObjectId
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ownedItemId String       @db.ObjectId
+  ownedItem   OwnedItem    @relation(fields: [ownedItemId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("purchases")
 }
 
 model Gift {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  senderId    String   @db.ObjectId
-  recipientId String   @db.ObjectId
-  itemId      String?  @db.ObjectId
-  amount      Float? // optional for item-based gift
-  message     String
-  createdAt   DateTime @default(now())
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  senderId    String       @db.ObjectId
+  sender      User         @relation("SentGifts", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String       @db.ObjectId
+  recipient   User         @relation("ReceivedGifts", fields: [recipientId], references: [id], onDelete: Cascade)
+  ownedItemId String       @db.ObjectId
+  ownedItem   OwnedItem    @relation(fields: [ownedItemId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  sender    User  @relation("SentGifts", fields: [senderId], references: [id])
-  recipient User  @relation("ReceivedGifts", fields: [recipientId], references: [id])
-  item      Item? @relation(fields: [itemId], references: [id])
+  @@map("gifts")
+}
+
+model DepositRate {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name      String
+  rate      Float
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("deposit_rates")
 }
