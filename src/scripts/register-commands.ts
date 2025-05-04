@@ -10,6 +10,12 @@ const commands = [
     type: 1, // CHAT_INPUT
     options: [
       {
+        name: 'username',
+        description: 'Your username',
+        type: 3, // STRING
+        required: true,
+      },
+      {
         name: 'password',
         description: 'Your password',
         type: 3, // STRING
