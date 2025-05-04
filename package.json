@@ -24,7 +24,8 @@
     "seed-withdraw-request": "npx tsx prisma/seed-withdraw-request.ts",
     "seed-gift": "npx tsx prisma/seed-gift.ts",
     "seed-transaction": "npx tsx prisma/seed-transaction.ts",
-    "seed-all": "npm run seed-user && npm run seed-item && npm run seed-deposit-request && npm run seed-withdraw-request && npm run seed-gift && npm run seed-transaction"
+    "seed-all": "npm run seed-user && npm run seed-item && npm run seed-deposit-request && npm run seed-withdraw-request && npm run seed-gift && npm run seed-transaction",
+    "register-commands": "ts-node src/scripts/register-commands.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -40,8 +41,10 @@
     "chalk": "^5.4.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "discord.js": "^14.19.3",
     "got": "^14.4.7",
     "morgan": "^1.10.0",
+    "necord": "^6.8.13",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
