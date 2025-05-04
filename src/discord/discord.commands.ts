@@ -27,11 +27,12 @@ export class DiscordCommands {
       await this.prisma.user.update({
         where: { discordId: interaction.user.id },
         data: {
+          username: options.username,
           password: hashedPassword,
         },
       });
       return interaction.reply({
-        content: 'บัญชี Discord ของคุณได้แก้ไขรหัสผ่านแล้ว!',
+        content: 'บัญชี Discord ของคุณได้แก้ไขชื่อผู้ใช้งานและรหัสผ่านแล้ว!',
         ephemeral: true,
       });
     }
@@ -39,7 +40,7 @@ export class DiscordCommands {
     await this.prisma.user.create({
       data: {
         discordId: interaction.user.id,
-        username: interaction.user.username,
+        username: options.username,
         email: `${interaction.user.id}@discord.com`,
         password: hashedPassword,
         avatar: interaction.user.avatarURL() || '',
