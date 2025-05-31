@@ -42,4 +42,4 @@ COPY prisma ./prisma
 EXPOSE 3000
 
 # Command to run the application
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
