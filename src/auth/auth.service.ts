@@ -40,7 +40,7 @@ export class AuthService {
         discordId: registerDto.discordId,
         username: registerDto.username,
         password: hashedPassword,
-        avatar: '/avatar.png',
+        avatar: registerDto.avatar || '/avatar.png',
         wallet: {
           create: {
             balance: 0,
