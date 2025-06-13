@@ -37,6 +37,26 @@ export class DiscordCommands {
       });
     }
 
+    // Generate unique account number
+    let accountNumber = Math.floor(
+      1000000000 + Math.random() * 9000000000,
+    ).toString();
+    let isUnique = false;
+
+    while (!isUnique) {
+      const existingAccount = await this.prisma.user.findFirst({
+        where: {
+          accountNumber,
+        },
+      });
+      if (!existingAccount) {
+        isUnique = true;
+      } else {
+        accountNumber = Math.floor(
+          1000000000 + Math.random() * 9000000000,
+        ).toString();
+      }
+    }
     await this.prisma.user.create({
       data: {
         discordId: interaction.user.id,
@@ -45,6 +65,7 @@ export class DiscordCommands {
         password: hashedPassword,
         avatar: interaction.user.avatarURL() || '',
         role: UserRole.NORMAL,
+        accountNumber,
         wallet: {
           create: {
             balance: 0,

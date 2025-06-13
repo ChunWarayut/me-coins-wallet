@@ -15,6 +15,7 @@ async function main() {
       password: hashedPassword,
       role: UserRole.ADMIN,
       discordId: '543063777101217802',
+      accountNumber: '1234567890',
       wallet: {
         create: {
           balance: 0,
@@ -30,6 +31,7 @@ async function main() {
       password: hashedPassword,
       role: UserRole.NORMAL,
       discordId: '543063777101217802',
+      accountNumber: '1234567891',
       wallet: {
         create: {
           balance: 500,
@@ -45,6 +47,7 @@ async function main() {
       password: hashedPassword,
       role: UserRole.PREMIUM,
       discordId: '543063777101217802',
+      accountNumber: '1234567892',
       wallet: {
         create: {
           balance: 2500,

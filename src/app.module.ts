@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DiscordModule } from './discord/discord.module';
+import { TransfersModule } from './transfers/transfers.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { DiscordModule } from './discord/discord.module';
     AuthModule,
     UsersModule,
     TransactionsModule,
+    TransfersModule,
     DiscordModule,
   ],
   controllers: [AppController],

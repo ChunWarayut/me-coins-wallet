@@ -13,6 +13,7 @@ model User {
   email         String        @unique
   password      String
   username      String        @unique
+  accountNumber String        @unique
   avatar        String
   role          UserRole      @default(NORMAL)
   wallet        Wallet?
@@ -22,6 +23,8 @@ model User {
   sentGifts     Gift[]        @relation("SentGifts")
   receivedGifts Gift[]        @relation("ReceivedGifts")
   ownedItems    OwnedItem[]
+  sentTransfers Transfer[]    @relation("SentTransfers")
+  receivedTransfers Transfer[] @relation("ReceivedTransfers")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   Transaction   Transaction[]
@@ -57,14 +60,16 @@ model Transaction {
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   walletId     String            @db.ObjectId
   wallet       Wallet            @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  depositId    String?           @unique @db.ObjectId
+  depositId    String?           @db.ObjectId
   deposit      Deposit?          @relation(fields: [depositId], references: [id])
-  withdrawalId String?           @unique @db.ObjectId
+  withdrawalId String?           @db.ObjectId
   withdrawal   Withdrawal?       @relation(fields: [withdrawalId], references: [id])
-  purchaseId   String?           @unique @db.ObjectId
+  purchaseId   String?           @db.ObjectId
   purchase     Purchase?         @relation(fields: [purchaseId], references: [id])
-  giftId       String?           @unique @db.ObjectId
+  giftId       String?           @db.ObjectId
   gift         Gift?             @relation(fields: [giftId], references: [id])
+  transferId   String?           @db.ObjectId
+  transfer     Transfer?         @relation(fields: [transferId], references: [id])
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -76,6 +81,7 @@ enum TransactionType {
   WITHDRAWAL
   PURCHASE
   GIFT
+  TRANSFER
 }
 
 enum TransactionStatus {
@@ -93,7 +99,7 @@ model Deposit {
   rate        Float         @default(1.0)
   userId      String        @db.ObjectId
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction Transaction?
+  transactions Transaction[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   comment     String?
@@ -113,7 +119,7 @@ model Withdrawal {
   status      WithdrawalStatus @default(PENDING)
   userId      String           @db.ObjectId
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction Transaction?
+  transactions Transaction[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   comment     String?
@@ -161,7 +167,7 @@ model Purchase {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   ownedItemId String       @db.ObjectId
   ownedItem   OwnedItem    @relation(fields: [ownedItemId], references: [id], onDelete: Cascade)
-  transaction Transaction?
+  transactions Transaction[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -176,7 +182,7 @@ model Gift {
   recipient   User         @relation("ReceivedGifts", fields: [recipientId], references: [id], onDelete: Cascade)
   ownedItemId String       @db.ObjectId
   ownedItem   OwnedItem    @relation(fields: [ownedItemId], references: [id], onDelete: Cascade)
-  transaction Transaction?
+  transactions Transaction[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -195,4 +201,27 @@ model DepositRate {
   updatedAt DateTime @updatedAt
 
   @@map("deposit_rates")
+}
+
+model Transfer {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  amount      Float
+  status      TransferStatus   @default(PENDING)
+  senderId    String           @db.ObjectId
+  sender      User             @relation("SentTransfers", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String           @db.ObjectId
+  receiver    User             @relation("ReceivedTransfers", fields: [receiverId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  comment     String?
+
+  @@map("transfers")
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
 }

@@ -33,6 +33,27 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
+    // Generate unique account number
+    let accountNumber = Math.floor(
+      1000000000 + Math.random() * 9000000000,
+    ).toString();
+    let isUnique = false;
+
+    while (!isUnique) {
+      const existingAccount = await this.prisma.user.findFirst({
+        where: {
+          accountNumber,
+        },
+      });
+      if (!existingAccount) {
+        isUnique = true;
+      } else {
+        accountNumber = Math.floor(
+          1000000000 + Math.random() * 9000000000,
+        ).toString();
+      }
+    }
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -41,6 +62,7 @@ export class AuthService {
         username: registerDto.username,
         password: hashedPassword,
         avatar: registerDto.avatar || '/avatar.png',
+        accountNumber,
         wallet: {
           create: {
             balance: 0,
@@ -122,8 +144,11 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-    return this.prisma.user.findUnique({
+    console.log('Auth Service - Validating user with ID:', userId);
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
+    console.log('Auth Service - Found user:', user);
+    return user;
   }
 }

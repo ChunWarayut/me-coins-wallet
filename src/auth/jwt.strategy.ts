@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 
 // Define the payload type
 interface JwtPayload {
+  id: string;
   sub: string;
   email: string;
   role: string;
@@ -26,12 +27,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.authService.validateUser(payload.sub);
+    console.log('JWT Strategy - Full payload:', payload);
+    console.log('JWT Strategy - Using id:', payload.id);
+    const user = await this.authService.validateUser(payload.id);
+    console.log('JWT Strategy - Found user:', user);
     if (!user) {
+      console.log('JWT Strategy - No user found, throwing Unauthorized');
       throw new UnauthorizedException();
     }
     return {
-      id: payload.sub,
+      id: payload.id,
       email: payload.email,
       role: payload.role,
     };
