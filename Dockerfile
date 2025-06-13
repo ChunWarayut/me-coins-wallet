@@ -3,9 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
+
 # Copy package files
-COPY package*.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
 
 # Install dependencies
 RUN yarn install --frozen-lockfile
@@ -25,8 +27,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
 
 # Install production dependencies only
 RUN yarn install --frozen-lockfile --production
