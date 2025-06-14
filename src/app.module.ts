@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DiscordModule } from './discord/discord.module';
 import { TransfersModule } from './transfers/transfers.module';
+import { ItemsModule } from './items/items.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TransfersModule } from './transfers/transfers.module';
     TransactionsModule,
     TransfersModule,
     DiscordModule,
+    ItemsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
