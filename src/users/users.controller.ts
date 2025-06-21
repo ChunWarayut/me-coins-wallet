@@ -21,8 +21,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all users (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Return all users' })
+  @ApiOperation({ summary: 'ดึงข้อมูลผู้ใช้ทั้งหมด (เฉพาะ Admin)' })
+  @ApiResponse({ status: 200, description: 'ส่งคืนข้อมูลผู้ใช้ทั้งหมด' })
   async getAllUsers() {
     return this.usersService.findAll();
   }
@@ -30,8 +30,8 @@ export class UsersController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get the current user' })
-  @ApiResponse({ status: 200, description: 'Return the current user' })
+  @ApiOperation({ summary: 'ดึงข้อมูลผู้ใช้ปัจจุบัน' })
+  @ApiResponse({ status: 200, description: 'ส่งคืนข้อมูลผู้ใช้ปัจจุบัน' })
   async getCurrentUser(@GetUser() user: User) {
     console.log('user', user);
     console.log('user.id', user.id);
@@ -42,9 +42,9 @@ export class UsersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a user by ID' })
-  @ApiResponse({ status: 200, description: 'Return the user' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiOperation({ summary: 'ดึงข้อมูลผู้ใช้ตาม ID' })
+  @ApiResponse({ status: 200, description: 'ส่งคืนข้อมูลผู้ใช้' })
+  @ApiResponse({ status: 404, description: 'ไม่พบผู้ใช้' })
   async getUserById(@Param('id') id: string) {
     return this.usersService.findById(id);
   }
@@ -53,9 +53,9 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user role (Admin only)' })
-  @ApiResponse({ status: 200, description: 'User role updated' })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiOperation({ summary: 'อัปเดตบทบาทผู้ใช้ (เฉพาะ Admin)' })
+  @ApiResponse({ status: 200, description: 'อัปเดตบทบาทผู้ใช้สำเร็จ' })
+  @ApiResponse({ status: 404, description: 'ไม่พบผู้ใช้' })
   async updateUserRole(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,

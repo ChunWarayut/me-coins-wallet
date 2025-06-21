@@ -1,10 +1,32 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
-import { Context, Options, SlashCommand, SlashCommandContext } from 'necord';
+import {
+  Context,
+  Options,
+  SlashCommand,
+  SlashCommandContext,
+  Button,
+  ButtonContext,
+  StringSelect,
+  StringSelectContext,
+} from 'necord';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, TransactionType, TransactionStatus } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
+import { DonateDto } from './dto/donate.dto';
 import * as bcrypt from 'bcrypt';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  GuildMember,
+  ChannelType,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+} from 'discord.js';
+
+const ITEMS_PER_PAGE = 9;
 
 @Injectable()
 export class DiscordCommands {
@@ -12,7 +34,7 @@ export class DiscordCommands {
 
   @SlashCommand({
     name: 'register',
-    description: 'Register your Discord account',
+    description: 'ลงทะเบียนบัญชี Discord ของคุณ',
   })
   public async onRegister(
     @Context() [interaction]: SlashCommandContext,
@@ -82,7 +104,7 @@ export class DiscordCommands {
 
   @SlashCommand({
     name: 'balance',
-    description: 'Check your wallet balance',
+    description: 'ตรวจสอบยอดเงินในกระเป๋าของคุณ',
   })
   public async onBalance(@Context() [interaction]: SlashCommandContext) {
     const user = await this.prisma.user.findUnique({
@@ -92,22 +114,477 @@ export class DiscordCommands {
 
     if (!user) {
       return interaction.reply({
-        content: 'You need to link your Discord account first!',
+        content: 'คุณต้องลงทะเบียนบัญชี Discord ก่อน!',
         ephemeral: true,
       });
     }
 
     if (!user.wallet) {
       return interaction.reply({
-        content: "You don't have a wallet yet!",
+        content: 'คุณยังไม่มีกระเป๋าเงิน!',
         ephemeral: true,
       });
     }
 
     const wallet = user.wallet as { balance: number };
     return interaction.reply({
-      content: `Your current balance is: ${wallet.balance} coins`,
+      content: `ยอดเงินปัจจุบันของคุณ: ${wallet.balance} coins`,
       ephemeral: true,
     });
+  }
+
+  @SlashCommand({
+    name: 'gifts',
+    description: 'แสดงของขวัญทั้งหมดที่มีในระบบ',
+  })
+  public async onGifts(@Context() [interaction]: SlashCommandContext) {
+    const member = interaction.member as GuildMember;
+    const voiceChannel = member?.voice?.channel;
+
+    if (!voiceChannel || voiceChannel.type !== ChannelType.GuildStageVoice) {
+      return interaction.reply({
+        content: 'คำสั่งนี้ใช้ได้เฉพาะในห้อง Voice Stage เท่านั้น',
+        ephemeral: true,
+      });
+    }
+
+    const giftsPage = await this.generateGiftsPage(1);
+
+    return interaction.reply({
+      ...giftsPage,
+      ephemeral: true,
+    });
+  }
+
+  private async generateGiftsPage(page: number) {
+    const items = await this.prisma.item.findMany({
+      orderBy: { price: 'asc' },
+    });
+
+    const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+    const currentPage = Math.max(1, Math.min(page, totalPages));
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const pageItems = items.slice(start, end);
+
+    const embed = new EmbedBuilder()
+      .setTitle('🎁 ของขวัญทั้งหมดในระบบ')
+      .setDescription(
+        'เลือกของขวัญที่ต้องการส่งให้เพื่อนในห้อง Stage Voice! 🎁\nใช้เมนูด้านล่างเพื่อเลือกหน้า',
+      )
+      .setColor(0x5865f2)
+      .setTimestamp()
+      .setFooter({ text: `หน้า ${currentPage} จาก ${totalPages}` });
+
+    if (pageItems.length > 0) {
+      pageItems.forEach((item) => {
+        embed.addFields({
+          name: `${item.imageUrl} ${item.name}`,
+          value: `**ราคา:** ${item.price} coins`,
+          inline: true,
+        });
+      });
+    } else {
+      embed.setDescription('ยังไม่มีของขวัญในระบบ');
+    }
+
+    const rows: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] =
+      [];
+    for (let i = 0; i < pageItems.length; i += 3) {
+      const row = new ActionRowBuilder<ButtonBuilder>();
+      const rowItems = pageItems.slice(i, i + 3);
+      rowItems.forEach((item) => {
+        const button = new ButtonBuilder()
+          .setCustomId(`donate_${item.id}`)
+          .setLabel(`${item.name}`)
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji(item.imageUrl as string);
+        row.addComponents(button);
+      });
+      rows.push(row);
+    }
+
+    if (totalPages > 1) {
+      const pageOptions = Array.from({ length: totalPages }, (_, i) => {
+        const pageNum = i + 1;
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(`ไปที่หน้า ${pageNum}`)
+          .setValue(`gifts_page_${pageNum}`)
+          .setEmoji(pageNum === currentPage ? '📍' : '📄')
+          .setDefault(pageNum === currentPage);
+      });
+
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('gifts_page_select')
+        .setPlaceholder('เลือกหน้าของขวัญ')
+        .addOptions(pageOptions);
+
+      const paginationRow =
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          selectMenu,
+        );
+      rows.push(paginationRow);
+    }
+
+    return {
+      embeds: [embed],
+      components: rows,
+    };
+  }
+
+  @StringSelect('gifts_page_select')
+  public async onGiftsPageSelect(
+    @Context() [interaction]: StringSelectContext,
+  ) {
+    const selectedValue = interaction.values[0];
+    const newPage = parseInt(selectedValue.replace('gifts_page_', ''), 10);
+
+    if (isNaN(newPage)) {
+      return interaction.update({
+        content: 'มีบางอย่างผิดพลาด กรุณาลองใหม่อีกครั้ง',
+        embeds: [],
+        components: [],
+      });
+    }
+
+    const giftsPage = await this.generateGiftsPage(newPage);
+
+    return interaction.update(giftsPage);
+  }
+
+  @Button('donate_:customId')
+  public async onDonateButton(@Context() [interaction]: ButtonContext) {
+    // Extract item ID from the button's custom ID
+    const customId = interaction.customId;
+
+    // Check if this is a donate button and extract item ID
+    if (!customId.startsWith('donate_')) {
+      return;
+    }
+
+    const itemId = customId.replace('donate_', '');
+
+    if (!itemId) {
+      return interaction.reply({
+        content: 'ไม่พบข้อมูลของขวัญที่เลือก',
+        ephemeral: true,
+      });
+    }
+
+    // Check if user is in a voice channel
+    const member = interaction.member;
+    if (!member || !('voice' in member) || !member.voice.channel) {
+      return interaction.reply({
+        content: 'คุณต้องอยู่ในห้องเสียงก่อนที่จะโดเนทของขวัญ',
+        ephemeral: true,
+      });
+    }
+
+    const voiceChannel = member.voice.channel;
+
+    // Check if it's a stage channel or has a speaker
+    let recipientId: string | null = null;
+
+    // For now, we'll use the channel owner as recipient
+    // You can enhance this logic based on your specific requirements
+    if (voiceChannel.guild) {
+      // Get the channel owner or first person in the channel
+      const channelMembers = voiceChannel.members;
+      if (channelMembers.size > 0) {
+        // Get the first member in the channel (you might want to implement more sophisticated logic)
+        recipientId = channelMembers.first()?.id || null;
+      }
+    }
+
+    if (!recipientId) {
+      return interaction.reply({
+        content: 'ไม่พบผู้รับของขวัญในห้องเสียงนี้',
+        ephemeral: true,
+      });
+    }
+
+    // Get the sender's user and wallet
+    const sender = await this.prisma.user.findUnique({
+      where: { discordId: interaction.user.id },
+      include: { wallet: true },
+    });
+
+    if (!sender || !sender.wallet) {
+      return interaction.reply({
+        content: 'คุณต้องลงทะเบียนและมีกระเป๋าเงินก่อน',
+        ephemeral: true,
+      });
+    }
+
+    // Get the recipient's user
+    const recipient = await this.prisma.user.findUnique({
+      where: { discordId: recipientId },
+    });
+
+    if (!recipient) {
+      return interaction.reply({
+        content: 'ผู้รับของขวัญยังไม่ได้ลงทะเบียนในระบบ',
+        ephemeral: true,
+      });
+    }
+
+    // Get the item
+    const item = await this.prisma.item.findUnique({
+      where: { id: itemId },
+    });
+
+    if (!item) {
+      return interaction.reply({
+        content: 'ไม่พบของขวัญที่เลือก',
+        ephemeral: true,
+      });
+    }
+
+    // Check if sender has enough balance
+    if (sender.wallet.balance < item.price) {
+      return interaction.reply({
+        content: `คุณมีเงินไม่เพียงพอ ต้องการ ${item.price} coins แต่มี ${sender.wallet.balance} coins`,
+        ephemeral: true,
+      });
+    }
+
+    // Create the gift transaction
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Create owned item for recipient
+        const ownedItem = await prisma.ownedItem.create({
+          data: {
+            userId: recipient.id,
+            itemId: item.id,
+            isGifted: true,
+          },
+        });
+
+        // Create gift record
+        const gift = await prisma.gift.create({
+          data: {
+            senderId: sender.id,
+            recipientId: recipient.id,
+            ownedItemId: ownedItem.id,
+          },
+        });
+
+        // Create transaction record for sender
+        await prisma.transaction.create({
+          data: {
+            amount: -item.price,
+            type: TransactionType.GIFT,
+            status: TransactionStatus.COMPLETED,
+            userId: sender.id,
+            walletId: sender.wallet!.id,
+            giftId: gift.id,
+          },
+        });
+
+        // Update sender's balance
+        await prisma.wallet.update({
+          where: { id: sender.wallet!.id },
+          data: { balance: sender.wallet!.balance - item.price },
+        });
+      });
+
+      const successEmbed = new EmbedBuilder()
+        .setTitle('🎁 โดเนทของขวัญสำเร็จ!')
+        .setDescription(
+          `**${sender.username}** ได้มอบของขวัญให้กับ **<@${recipientId}>**`,
+        )
+        .setColor(0x57f287) // Green
+        .setAuthor({
+          name: `From: ${interaction.user.username}`,
+          iconURL: interaction.user.displayAvatarURL(),
+        })
+        .addFields(
+          {
+            name: 'ของขวัญที่ส่ง',
+            value: `${item.imageUrl} ${item.name}`,
+            inline: true,
+          },
+          { name: 'ราคา', value: `💰 ${item.price} coins`, inline: true },
+        )
+        // .setThumbnail(item.imageUrl)
+        .setTimestamp()
+        .setFooter({
+          text: `Me-Coins Wallet | ID: ${interaction.id}`,
+          iconURL: interaction.client.user?.displayAvatarURL(),
+        });
+
+      return interaction.reply({
+        embeds: [successEmbed],
+        ephemeral: false,
+      });
+    } catch (error) {
+      console.error('Error creating gift:', error);
+      return interaction.reply({
+        content: 'เกิดข้อผิดพลาดในการโดเนทของขวัญ',
+        ephemeral: true,
+      });
+    }
+  }
+
+  @SlashCommand({
+    name: 'donate',
+    description: 'โดเนทของขวัญให้กับเจ้าของห้องเสียงหรือผู้พูด',
+  })
+  public async onDonate(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: DonateDto,
+  ) {
+    const member = interaction.member as GuildMember;
+    const voiceChannel = member?.voice?.channel;
+
+    if (!voiceChannel || voiceChannel.type !== ChannelType.GuildStageVoice) {
+      return interaction.reply({
+        content: 'คำสั่งนี้ใช้ได้เฉพาะในห้อง Voice Stage เท่านั้น',
+        ephemeral: true,
+      });
+    }
+
+    // Check if it's a stage channel or has a speaker
+    let recipientId: string | null = null;
+
+    // For now, we'll use the channel owner as recipient
+    // You can enhance this logic based on your specific requirements
+    if (voiceChannel.guild) {
+      // Get the channel owner or first person in the channel
+      const channelMembers = voiceChannel.members;
+      if (channelMembers.size > 0) {
+        // Get the first member in the channel (you might want to implement more sophisticated logic)
+        recipientId = channelMembers.first()?.id || null;
+      }
+    }
+
+    if (!recipientId) {
+      return interaction.reply({
+        content: 'ไม่พบผู้รับของขวัญในห้องเสียงนี้',
+        ephemeral: true,
+      });
+    }
+
+    // Get the sender's user and wallet
+    const sender = await this.prisma.user.findUnique({
+      where: { discordId: interaction.user.id },
+      include: { wallet: true },
+    });
+
+    if (!sender || !sender.wallet) {
+      return interaction.reply({
+        content: 'คุณต้องลงทะเบียนและมีกระเป๋าเงินก่อน',
+        ephemeral: true,
+      });
+    }
+
+    // Get the recipient's user
+    const recipient = await this.prisma.user.findUnique({
+      where: { discordId: recipientId },
+    });
+
+    if (!recipient) {
+      return interaction.reply({
+        content: 'ผู้รับของขวัญยังไม่ได้ลงทะเบียนในระบบ',
+        ephemeral: true,
+      });
+    }
+
+    // Get the item
+    const item = await this.prisma.item.findUnique({
+      where: { id: options.itemId },
+    });
+
+    if (!item) {
+      return interaction.reply({
+        content: 'ไม่พบของขวัญที่เลือก',
+        ephemeral: true,
+      });
+    }
+
+    // Check if sender has enough balance
+    if (sender.wallet.balance < item.price) {
+      return interaction.reply({
+        content: `คุณมีเงินไม่เพียงพอ ต้องการ ${item.price} coins แต่มี ${sender.wallet.balance} coins`,
+        ephemeral: true,
+      });
+    }
+
+    // Create the gift transaction
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Create owned item for recipient
+        const ownedItem = await prisma.ownedItem.create({
+          data: {
+            userId: recipient.id,
+            itemId: item.id,
+            isGifted: true,
+          },
+        });
+
+        // Create gift record
+        const gift = await prisma.gift.create({
+          data: {
+            senderId: sender.id,
+            recipientId: recipient.id,
+            ownedItemId: ownedItem.id,
+          },
+        });
+
+        // Create transaction record for sender
+        await prisma.transaction.create({
+          data: {
+            amount: -item.price,
+            type: TransactionType.GIFT,
+            status: TransactionStatus.COMPLETED,
+            userId: sender.id,
+            walletId: sender.wallet!.id,
+            giftId: gift.id,
+          },
+        });
+
+        // Update sender's balance
+        await prisma.wallet.update({
+          where: { id: sender.wallet!.id },
+          data: { balance: sender.wallet!.balance - item.price },
+        });
+      });
+
+      const successEmbed = new EmbedBuilder()
+        .setTitle('🎁 โดเนทของขวัญสำเร็จ!')
+        .setDescription(
+          `**${sender.username}** ได้มอบของขวัญให้กับ **<@${recipientId}>**`,
+        )
+        .setColor(0x57f287) // Green
+        .setAuthor({
+          name: `From: ${interaction.user.username}`,
+          iconURL: interaction.user.displayAvatarURL(),
+        })
+        .addFields(
+          {
+            name: 'ของขวัญที่ส่ง',
+            value: `${item.imageUrl} ${item.name}`,
+            inline: true,
+          },
+          { name: 'ราคา', value: `💰 ${item.price} coins`, inline: true },
+        )
+        .setThumbnail(item.imageUrl)
+        .setTimestamp()
+        .setFooter({
+          text: `Me-Coins Wallet | ID: ${interaction.id}`,
+          iconURL: interaction.client.user?.displayAvatarURL(),
+        });
+
+      return interaction.reply({
+        embeds: [successEmbed],
+        ephemeral: false,
+      });
+    } catch (error) {
+      console.error('Error creating gift:', error);
+      return interaction.reply({
+        content: 'เกิดข้อผิดพลาดในการโดเนทของขวัญ',
+        ephemeral: true,
+      });
+    }
   }
 }

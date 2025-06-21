@@ -19,12 +19,13 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed-user": "npx tsx prisma/seed-user.ts",
+    "seed-items": "npx tsx prisma/seed-items.ts",
     "seed-item": "npx tsx prisma/seed-item.ts",
     "seed-deposit-request": "npx tsx prisma/seed-deposit-request.ts",
     "seed-withdraw-request": "npx tsx prisma/seed-withdraw-request.ts",
     "seed-gift": "npx tsx prisma/seed-gift.ts",
     "seed-transaction": "npx tsx prisma/seed-transaction.ts",
-    "seed-all": "npm run seed-user && npm run seed-item && npm run seed-deposit-request && npm run seed-withdraw-request && npm run seed-gift && npm run seed-transaction",
+    "seed-all": "npm run seed-user && npm run seed-items && npm run seed-item && npm run seed-deposit-request && npm run seed-withdraw-request && npm run seed-gift && npm run seed-transaction",
     "register-commands": "ts-node src/scripts/register-commands.ts"
   },
   "dependencies": {
@@ -102,5 +103,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed-items.ts"
   }
 }

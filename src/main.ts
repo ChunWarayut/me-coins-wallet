@@ -13,7 +13,7 @@ async function bootstrap() {
   // Setup Swagger documentation
   const config = new DocumentBuilder()
     .setTitle('MeCoins API')
-    .setDescription('API documentation for the MeCoins platform')
+    .setDescription('เอกสาร API สำหรับแพลตฟอร์ม MeCoins')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -23,6 +23,6 @@ async function bootstrap() {
   app.use(morgan('combined'));
 
   await app.listen(3000);
-  console.log(chalk.green(`Application is running on: ${await app.getUrl()}`));
+  console.log(chalk.green(`แอปพลิเคชันกำลังทำงานที่: ${await app.getUrl()}`));
 }
 bootstrap();

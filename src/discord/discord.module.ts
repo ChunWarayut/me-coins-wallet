@@ -9,7 +9,12 @@ import { DiscordCommands } from './discord.commands';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         token: configService.get<string>('DISCORD_BOT_TOKEN') as string,
-        intents: ['Guilds', 'GuildMessages', 'DirectMessages'],
+        intents: [
+          'Guilds',
+          'GuildMessages',
+          'DirectMessages',
+          'GuildVoiceStates',
+        ],
         development: false,
       }),
       inject: [ConfigService],

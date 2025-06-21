@@ -10,18 +10,18 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User successfully registered' })
-  @ApiResponse({ status: 409, description: 'Email or username already exists' })
+  @ApiOperation({ summary: 'ลงทะเบียนผู้ใช้ใหม่' })
+  @ApiResponse({ status: 201, description: 'ลงทะเบียนผู้ใช้สำเร็จ' })
+  @ApiResponse({ status: 409, description: 'อีเมลหรือชื่อผู้ใช้มีอยู่แล้ว' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Log in a user' })
-  @ApiResponse({ status: 200, description: 'User successfully logged in' })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiOperation({ summary: 'เข้าสู่ระบบผู้ใช้' })
+  @ApiResponse({ status: 200, description: 'เข้าสู่ระบบสำเร็จ' })
+  @ApiResponse({ status: 401, description: 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
