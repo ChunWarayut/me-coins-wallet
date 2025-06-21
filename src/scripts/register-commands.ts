@@ -46,6 +46,16 @@ const commands = [
       },
     ],
   },
+  {
+    name: 'my-gifts',
+    description: 'ดูรายการของขวัญที่คุณมีในครอบครอง',
+    type: 1, // CHAT_INPUT
+  },
+  {
+    name: 'my-inventory',
+    description: 'ดูรายการไอเทมทั้งหมดที่คุณมีในครอบครอง',
+    type: 1, // CHAT_INPUT
+  },
 ];
 
 const rest = new REST({ version: '10' }).setToken(

@@ -587,4 +587,155 @@ export class DiscordCommands {
       });
     }
   }
+
+  @SlashCommand({
+    name: 'my-gifts',
+    description: 'ดูรายการของขวัญทั้งหมดที่คุณได้รับ',
+  })
+  public async onMyGifts(@Context() [interaction]: SlashCommandContext) {
+    const user = await this.prisma.user.findUnique({
+      where: { discordId: interaction.user.id },
+    });
+
+    if (!user) {
+      return interaction.reply({
+        content: 'คุณต้องลงทะเบียนก่อนจึงจะสามารถดูของขวัญของคุณได้',
+        ephemeral: true,
+      });
+    }
+
+    const ownedGifts = await this.prisma.ownedItem.findMany({
+      where: {
+        userId: user.id,
+        isGifted: true,
+      },
+      include: {
+        item: true,
+        gifts: {
+          include: {
+            sender: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (ownedGifts.length === 0) {
+      return interaction.reply({
+        content: 'คุณยังไม่ได้รับของขวัญใดๆ เลย 🎁',
+        ephemeral: true,
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('🎁 ของขวัญของฉัน')
+      .setDescription(
+        `รายการของขวัญทั้งหมดที่ <@${interaction.user.id}> ได้รับ`,
+      )
+      .setColor(0x5865f2)
+      .setAuthor({
+        name: interaction.user.username,
+        iconURL: interaction.user.displayAvatarURL(),
+      });
+
+    ownedGifts.forEach((ownedItem) => {
+      // Assuming one gift per owned item for simplicity
+      const gift = ownedItem.gifts[0];
+      const sender = gift?.sender;
+      const senderUsername = sender ? sender.username : 'ไม่พบชื่อผู้ส่ง';
+      embed.addFields({
+        name: `${ownedItem.item.imageUrl} ${ownedItem.item.name}`,
+        value: `ได้รับจาก: **${senderUsername}**\nเมื่อ: <t:${Math.floor(
+          ownedItem.createdAt.getTime() / 1000,
+        )}:R>`,
+        inline: false,
+      });
+    });
+
+    return interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  }
+
+  @SlashCommand({
+    name: 'my-inventory',
+    description: 'ดูรายการไอเทมทั้งหมดที่คุณมีในครอบครอง',
+  })
+  public async onMyInventory(@Context() [interaction]: SlashCommandContext) {
+    const user = await this.prisma.user.findUnique({
+      where: { discordId: interaction.user.id },
+    });
+
+    if (!user) {
+      return interaction.reply({
+        content: 'คุณต้องลงทะเบียนก่อนจึงจะสามารถดูไอเทมของคุณได้',
+        ephemeral: true,
+      });
+    }
+
+    const ownedItems = await this.prisma.ownedItem.findMany({
+      where: {
+        userId: user.id,
+      },
+      include: {
+        item: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (ownedItems.length === 0) {
+      return interaction.reply({
+        content: 'คุณยังไม่มีไอเทมใดๆ ในครอบครอง 🎒',
+        ephemeral: true,
+      });
+    }
+
+    const itemCounts = ownedItems.reduce(
+      (acc, { item }) => {
+        acc[item.id] = acc[item.id] || { ...item, count: 0 };
+        acc[item.id].count++;
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          id: string;
+          name: string;
+          description: string | null;
+          imageUrl: string;
+          price: number;
+          count: number;
+        }
+      >,
+    );
+
+    const embed = new EmbedBuilder()
+      .setTitle('🎒 ช่องเก็บของของฉัน')
+      .setDescription(
+        `รายการไอเทมทั้งหมดที่ <@${interaction.user.id}> มีในครอบครอง`,
+      )
+      .setColor(0x5865f2)
+      .setAuthor({
+        name: interaction.user.username,
+        iconURL: interaction.user.displayAvatarURL(),
+      });
+
+    Object.values(itemCounts).forEach((item) => {
+      embed.addFields({
+        name: `${item.imageUrl} ${item.name}`,
+        value: `จำนวน: **${item.count}** ชิ้น`,
+        inline: true,
+      });
+    });
+
+    return interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  }
 }
