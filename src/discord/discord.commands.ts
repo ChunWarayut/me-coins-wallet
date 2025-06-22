@@ -236,13 +236,27 @@ export class DiscordCommands {
         ephemeral: true,
       });
     }
-
-    const firstMember = voiceChannel.members.last();
+    console.log(`Voice Channel Name: ${voiceChannel.name}`);
     console.log(
-      firstMember
-        ? `คนแรกที่เข้าห้อง voice stage: ${firstMember.user.username}`
-        : 'ไม่มีใครอยู่ในห้อง voice stage',
+      `Members in Channel: ${voiceChannel.members.map((member) => member.displayName).join(', ')}`,
     );
+
+    const matchingMember = voiceChannel.members.find(
+      (member) =>
+        member.displayName ===
+        voiceChannel.name.replace('🎩・', '').replace(' ไลฟ์', ''),
+    );
+
+    console.log(
+      `Matching Member: ${matchingMember ? matchingMember.displayName : 'None'}`,
+    );
+
+    if (!matchingMember) {
+      return interaction.reply({
+        content: 'ไม่พบสมาชิกที่มีชื่อเดียวกับชื่อห้อง',
+        ephemeral: true,
+      });
+    }
 
     const giftsPage = await this.generateGiftsPage(1);
 
@@ -292,7 +306,8 @@ export class DiscordCommands {
       rowItems.forEach((item) => {
         const button = new ButtonBuilder()
           .setCustomId(`donate_${item.id}`)
-          .setLabel(`${item.name}`)
+          // .setLabel(`${item.name}`)
+          .setLabel(`${item.price} coins`)
           .setStyle(ButtonStyle.Secondary)
           .setEmoji(item.imageUrl as string);
         row.addComponents(button);
@@ -385,10 +400,15 @@ export class DiscordCommands {
     // You can enhance this logic based on your specific requirements
     if (voiceChannel.guild) {
       // Get the channel owner or first person in the channel
-      const channelMembers = voiceChannel.members;
-      if (channelMembers.size > 0) {
-        // Get the first member in the channel (you might want to implement more sophisticated logic)
-        recipientId = channelMembers.last()?.id || null;
+
+      const matchingMember = voiceChannel.members.find(
+        (member) =>
+          member.displayName ===
+          voiceChannel.name.replace('🎩・', '').replace(' ไลฟ์', ''),
+      );
+
+      if (matchingMember) {
+        recipientId = matchingMember.id;
       }
     }
 
