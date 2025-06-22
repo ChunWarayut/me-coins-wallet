@@ -1,15 +1,24 @@
-import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import { NumberOption, StringOption } from 'necord';
 
 export class TransferDto {
-  @IsNotEmpty()
-  @IsString()
+  @StringOption({
+    name: 'receiver-account-number',
+    description: 'รหัสบัญชีธนาคารของผู้รับ',
+    required: true,
+  })
   receiverAccountNumber: string;
 
-  @IsNotEmpty()
-  @IsNumber()
-  @Min(1)
+  @NumberOption({
+    name: 'amount',
+    description: 'จำนวนเงินที่จะโอน',
+    required: true,
+  })
   amount: number;
 
-  @IsString()
+  @StringOption({
+    name: 'comment',
+    description: 'หมายเหตุ',
+    required: false,
+  })
   comment?: string;
 }
