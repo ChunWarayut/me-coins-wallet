@@ -3,6 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NecordModule } from 'necord';
 import { DiscordService } from './discord.service';
 import { DiscordCommands } from './discord.commands';
+import { TransfersService } from '../transfers/transfers.service';
+import { PrismaService } from '../prisma/prisma.service';
+
 @Module({
   imports: [
     NecordModule.forRootAsync({
@@ -13,6 +16,25 @@ import { DiscordCommands } from './discord.commands';
           'Guilds',
           'GuildMessages',
           'DirectMessages',
+          'GuildMembers',
+          'GuildPresences',
+          'GuildEmojisAndStickers',
+          'GuildScheduledEvents',
+          'GuildInvites',
+          'GuildWebhooks',
+          'GuildIntegrations',
+          'GuildScheduledEvents',
+          'GuildInvites',
+          'GuildWebhooks',
+          'GuildIntegrations',
+          'GuildScheduledEvents',
+          'GuildInvites',
+          'GuildWebhooks',
+          'GuildIntegrations',
+          'GuildScheduledEvents',
+          'GuildInvites',
+          'GuildWebhooks',
+          'GuildIntegrations',
           'GuildVoiceStates',
         ],
         development: false,
@@ -20,7 +42,7 @@ import { DiscordCommands } from './discord.commands';
       inject: [ConfigService],
     }),
   ],
-  providers: [DiscordService, DiscordCommands],
+  providers: [DiscordService, DiscordCommands, TransfersService, PrismaService],
   exports: [DiscordService],
 })
 export class DiscordModule {}

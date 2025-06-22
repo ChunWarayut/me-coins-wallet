@@ -11,9 +11,11 @@ import {
   StringSelectContext,
 } from 'necord';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransfersService } from '../transfers/transfers.service';
 import { UserRole, TransactionType, TransactionStatus } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import { DonateDto } from './dto/donate.dto';
+import { TransferDto } from './dto/transfer.dto';
 import * as bcrypt from 'bcrypt';
 import {
   ActionRowBuilder,
@@ -30,7 +32,10 @@ const ITEMS_PER_PAGE = 9;
 
 @Injectable()
 export class DiscordCommands {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private transfersService: TransfersService,
+  ) {}
 
   @SlashCommand({
     name: 'register',
@@ -134,6 +139,90 @@ export class DiscordCommands {
   }
 
   @SlashCommand({
+    name: 'bank-number',
+    description: 'ดูเลขบัญชีธนาคารของคุณ',
+  })
+  public async onBankNumber(@Context() [interaction]: SlashCommandContext) {
+    const user = await this.prisma.user.findUnique({
+      where: { discordId: interaction.user.id },
+    });
+
+    if (!user) {
+      return interaction.reply({
+        content: 'คุณต้องลงทะเบียนบัญชี Discord ก่อน!',
+        ephemeral: true,
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('🏦 เลขบัญชีธนาคารของคุณ')
+      .setDescription(`**เลขบัญชี:** ${user.accountNumber}`)
+      .setColor(0x00ff00)
+      .setTimestamp()
+      .setFooter({ text: 'ใช้เลขบัญชีนี้สำหรับการโอนเงินเข้าบัญชี' });
+
+    return interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  }
+
+  @SlashCommand({
+    name: 'transfer',
+    description: 'โอนเงินไปยังบัญชีอื่น',
+  })
+  public async onTransfer(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: TransferDto,
+  ) {
+    try {
+      const transfer = await this.transfersService.createTransferFromDiscord(
+        interaction.user.id,
+        options,
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle('✅ การโอนเงินสำเร็จ')
+        .setDescription(
+          `**จำนวนเงิน:** ${options.amount} coins\n**ไปยัง:** ${transfer.receiver.username} (${transfer.receiver.accountNumber})\n**หมายเหตุ:** ${options.comment || 'ไม่มี'}`,
+        )
+        .setColor(0x00ff00)
+        .setTimestamp()
+        .setFooter({ text: `รหัสการโอน: ${transfer.id}` });
+
+      return interaction.reply({
+        embeds: [embed],
+        ephemeral: true,
+      });
+    } catch (error) {
+      let errorMessage = 'เกิดข้อผิดพลาดในการโอนเงิน';
+
+      if (error instanceof Error) {
+        if (error.message === 'Sender wallet not found') {
+          errorMessage = 'คุณต้องลงทะเบียนบัญชี Discord ก่อน!';
+        } else if (error.message === 'Receiver account not found') {
+          errorMessage = 'ไม่พบเลขบัญชีปลายทางที่ระบุ';
+        } else if (error.message === 'Cannot transfer to yourself') {
+          errorMessage = 'ไม่สามารถโอนเงินให้ตัวเองได้';
+        } else if (error.message === 'Insufficient balance') {
+          errorMessage = 'ยอดเงินในกระเป๋าไม่เพียงพอ';
+        }
+      }
+
+      const errorEmbed = new EmbedBuilder()
+        .setTitle('❌ การโอนเงินล้มเหลว')
+        .setDescription(errorMessage)
+        .setColor(0xff0000)
+        .setTimestamp();
+
+      return interaction.reply({
+        embeds: [errorEmbed],
+        ephemeral: true,
+      });
+    }
+  }
+
+  @SlashCommand({
     name: 'gifts',
     description: 'แสดงของขวัญทั้งหมดที่มีในระบบ',
   })
@@ -147,6 +236,13 @@ export class DiscordCommands {
         ephemeral: true,
       });
     }
+
+    const firstMember = voiceChannel.members.last();
+    console.log(
+      firstMember
+        ? `คนแรกที่เข้าห้อง voice stage: ${firstMember.user.username}`
+        : 'ไม่มีใครอยู่ในห้อง voice stage',
+    );
 
     const giftsPage = await this.generateGiftsPage(1);
 
@@ -292,7 +388,7 @@ export class DiscordCommands {
       const channelMembers = voiceChannel.members;
       if (channelMembers.size > 0) {
         // Get the first member in the channel (you might want to implement more sophisticated logic)
-        recipientId = channelMembers.first()?.id || null;
+        recipientId = channelMembers.last()?.id || null;
       }
     }
 
