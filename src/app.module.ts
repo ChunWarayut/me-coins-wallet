@@ -10,6 +10,7 @@ import { DiscordModule } from './discord/discord.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { ItemsModule } from './items/items.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SpaModule } from './spa.module';
 
 @Module({
   imports: [
@@ -22,6 +23,8 @@ import { PaymentsModule } from './payments/payments.module';
     DiscordModule,
     ItemsModule,
     PaymentsModule,
+    // SpaModule ต้องอยู่หลังสุดเพื่อให้ wildcard route ทำงานหลัง API routes
+    SpaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
