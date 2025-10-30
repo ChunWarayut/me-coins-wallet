@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตัวอย่างชำระเงินด้วย PromptPay</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+      text-align: center;
+    }
+    
+    .subtitle {
+      color: #666;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .amount-section {
+      background: #f7f9fc;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .amount-section label {
+      display: block;
+      color: #555;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .amount-input-wrapper {
+      display: flex;
+      align-items: center;
+      background: white;
+      border: 2px solid #e1e8ed;
+      border-radius: 8px;
+      padding: 12px;
+      transition: border-color 0.3s;
+    }
+    
+    .amount-input-wrapper:focus-within {
+      border-color: #667eea;
+    }
+    
+    .amount-input-wrapper input {
+      border: none;
+      outline: none;
+      font-size: 24px;
+      font-weight: 600;
+      width: 100%;
+      color: #333;
+    }
+    
+    .currency {
+      color: #999;
+      font-size: 18px;
+      margin-left: 8px;
+      font-weight: 600;
+    }
+    
+    .description-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e1e8ed;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 8px;
+      transition: border-color 0.3s;
+    }
+    
+    .description-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 20px;
+    }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .payment-section {
+      display: none;
+      text-align: center;
+      margin-top: 30px;
+    }
+    
+    .payment-section.active {
+      display: block;
+    }
+    
+    .qr-container {
+      background: white;
+      border: 2px solid #e1e8ed;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      display: inline-block;
+    }
+    
+    .qr-container img {
+      max-width: 280px;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    .status {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 15px;
+    }
+    
+    .status.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .status.succeeded {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status.failed {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .instructions {
+      color: #666;
+      font-size: 14px;
+      margin-top: 15px;
+      line-height: 1.6;
+    }
+    
+    .payment-info {
+      background: #f7f9fc;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+      text-align: left;
+    }
+    
+    .payment-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .payment-info-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .payment-info-label {
+      color: #666;
+    }
+    
+    .payment-info-value {
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .back-btn {
+      background: #f7f9fc;
+      color: #667eea;
+      margin-top: 10px;
+    }
+    
+    .back-btn:hover {
+      background: #e1e8ed;
+    }
+    
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💰 ชำระเงินด้วย PromptPay</h1>
+    <p class="subtitle">ระบบชำระเงินผ่าน Stripe PromptPay</p>
+    
+    <!-- ฟอร์มกรอกจำนวนเงิน -->
+    <div id="inputSection">
+      <div class="amount-section">
+        <label for="amount">จำนวนเงิน</label>
+        <div class="amount-input-wrapper">
+          <input type="number" id="amount" placeholder="100" min="1" step="0.01" value="100">
+          <span class="currency">THB</span>
+        </div>
+        <label for="email" style="margin-top: 15px; display: block;">อีเมล (จำเป็นสำหรับการคืนเงิน)</label>
+        <input type="email" id="email" class="description-input" placeholder="example@email.com" value="humansaees0@gmail.com" required />
+        <input type="text" id="description" class="description-input" placeholder="รายละเอียด (ไม่บังคับ)" style="margin-top: 8px;" />
+      </div>
+      
+      <button id="payBtn" class="btn">ชำระเงิน</button>
+    </div>
+    
+    <!-- ส่วนแสดง QR Code -->
+    <div id="paymentSection" class="payment-section">
+      <div class="payment-info">
+        <div class="payment-info-row">
+          <span class="payment-info-label">จำนวนเงิน:</span>
+          <span class="payment-info-value" id="displayAmount">-</span>
+        </div>
+        <div class="payment-info-row">
+          <span class="payment-info-label">รายการ:</span>
+          <span class="payment-info-value" id="displayDescription">-</span>
+        </div>
+        <div class="payment-info-row">
+          <span class="payment-info-label">Payment ID:</span>
+          <span class="payment-info-value" id="paymentId" style="font-size: 11px; word-break: break-all;">-</span>
+        </div>
+      </div>
+      
+      <div class="qr-container">
+        <img id="qrImage" src="" alt="QR Code PromptPay" />
+      </div>
+      
+      <div class="instructions">
+        📱 สแกน QR Code ด้วยแอปธนาคารของคุณ<br>
+        เพื่อชำระเงินผ่าน PromptPay
+      </div>
+      
+      <div class="status pending" id="statusBadge">
+        <span class="loading"></span>
+        <span id="statusText">กำลังรอการชำระเงิน...</span>
+      </div>
+      
+      <div id="errorMessage" class="error-message" style="display: none;"></div>
+      
+      <button id="backBtn" class="btn back-btn">กลับไปหน้าแรก</button>
+    </div>
+  </div>
+
+  <script>
+    // กำหนด API URL (เปลี่ยนตาม environment ของคุณ)
+    const API_BASE_URL = 'http://localhost:3000';
+    
+    let currentPaymentId = null;
+    let pollInterval = null;
+    
+    const inputSection = document.getElementById('inputSection');
+    const paymentSection = document.getElementById('paymentSection');
+      const payBtn = document.getElementById('payBtn');
+      const backBtn = document.getElementById('backBtn');
+      const amountInput = document.getElementById('amount');
+      const emailInput = document.getElementById('email');
+      const descriptionInput = document.getElementById('description');
+      const qrImage = document.getElementById('qrImage');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const displayAmount = document.getElementById('displayAmount');
+    const displayDescription = document.getElementById('displayDescription');
+    const paymentId = document.getElementById('paymentId');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // ฟังก์ชันสร้าง Payment Intent
+    async function createPayment() {
+      const amount = parseFloat(amountInput.value);
+      const email = emailInput.value.trim();
+      const description = descriptionInput.value.trim() || 'ชำระเงินผ่านระบบ';
+      
+      if (isNaN(amount) || amount < 1) {
+        alert('กรุณากรอกจำนวนเงินที่ถูกต้อง (ขั้นต่ำ 1 บาท)');
+        return;
+      }
+      
+      if (!email || !email.includes('@')) {
+        alert('กรุณากรอกอีเมลที่ถูกต้อง (จำเป็นสำหรับการคืนเงิน)');
+        return;
+      }
+      
+      payBtn.disabled = true;
+      payBtn.innerHTML = '<span class="loading"></span> กำลังสร้างรายการ...';
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/payments/intents`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: Math.round(amount * 100), // แปลงเป็นสตางค์
+            currency: 'thb',
+            email: email, // ✨ เพิ่ม email (จำเป็นสำหรับ PromptPay)
+            description: description,
+            metadata: {
+              source: 'web-example',
+              timestamp: new Date().toISOString(),
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('ไม่สามารถสร้างรายการชำระเงินได้');
+        }
+        
+        const data = await response.json();
+        
+        // ตรวจสอบว่ามี error message จาก backend ไหม
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // แสดงข้อมูล
+        currentPaymentId = data.paymentIntentId;
+        displayAmount.textContent = `${amount.toFixed(2)} THB`;
+        displayDescription.textContent = description;
+        paymentId.textContent = data.paymentIntentId;
+        
+        // แสดง QR Code
+        if (data.qr?.imageUrl) {
+          qrImage.src = data.qr.imageUrl;
+        } else if (data.qr?.data) {
+          // ลองทั้ง base64 และ plain text
+          if (data.qr.data.startsWith('data:')) {
+            qrImage.src = data.qr.data;
+          } else {
+            qrImage.src = `data:image/svg+xml;base64,${data.qr.data}`;
+          }
+        } else {
+          throw new Error('ไม่พบข้อมูล QR Code - กรุณาใช้ Live Mode (sk_live_) แทน Test Mode หรือตรวจสอบว่าบัญชี Stripe รองรับ PromptPay ในประเทศไทย');
+        }
+        
+        // ซ่อนฟอร์ม แสดงส่วนชำระเงิน
+        inputSection.style.display = 'none';
+        paymentSection.classList.add('active');
+        errorMessage.style.display = 'none';
+        
+        // เริ่มโพลสถานะ
+        startPolling();
+        
+      } catch (error) {
+        console.error('Error:', error);
+        alert('เกิดข้อผิดพลาด: ' + error.message);
+      } finally {
+        payBtn.disabled = false;
+        payBtn.innerHTML = 'ชำระเงิน';
+      }
+    }
+    
+    // ฟังก์ชันตรวจสอบสถานะการชำระเงิน
+    async function checkPaymentStatus() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/payments/${currentPaymentId}`);
+        
+        if (!response.ok) {
+          throw new Error('ไม่สามารถตรวจสอบสถานะได้');
+        }
+        
+        const data = await response.json();
+        
+        // อัปเดตสถานะ
+        updateStatusUI(data.status);
+        
+        // หยุดโพลถ้าการชำระเงินเสร็จสิ้นแล้ว
+        if (['succeeded', 'canceled', 'requires_payment_method'].includes(data.status)) {
+          stopPolling();
+        }
+        
+      } catch (error) {
+        console.error('Error checking status:', error);
+        errorMessage.textContent = 'เกิดข้อผิดพลาดในการตรวจสอบสถานะ: ' + error.message;
+        errorMessage.style.display = 'block';
+      }
+    }
+    
+    // ฟังก์ชันอัปเดต UI ตามสถานะ
+    function updateStatusUI(status) {
+      statusBadge.className = 'status';
+      
+      switch (status) {
+        case 'succeeded':
+          statusBadge.classList.add('succeeded');
+          statusText.innerHTML = '✅ ชำระเงินสำเร็จ!';
+          break;
+          
+        case 'requires_action':
+        case 'requires_confirmation':
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = '<span class="loading"></span> กำลังรอการชำระเงิน...';
+          break;
+          
+        case 'canceled':
+          statusBadge.classList.add('failed');
+          statusText.innerHTML = '❌ ยกเลิกการชำระเงิน';
+          break;
+          
+        case 'requires_payment_method':
+        case 'processing':
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = '<span class="loading"></span> กำลังประมวลผล...';
+          break;
+          
+        default:
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = `สถานะ: ${status}`;
+      }
+    }
+    
+    // เริ่มโพลสถานะทุก 3 วินาที
+    function startPolling() {
+      // ตรวจสอบทันทีครั้งแรก
+      checkPaymentStatus();
+      
+      // ตรวจสอบทุก 3 วินาที
+      pollInterval = setInterval(checkPaymentStatus, 3000);
+      
+      // หยุดโพลอัตโนมัติหลัง 10 นาที (timeout)
+      setTimeout(() => {
+        if (pollInterval) {
+          stopPolling();
+          errorMessage.textContent = 'หมดเวลารอการชำระเงิน กรุณาลองใหม่อีกครั้ง';
+          errorMessage.style.display = 'block';
+        }
+      }, 600000); // 10 minutes
+    }
+    
+    // หยุดโพลสถานะ
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+    
+    // กลับไปหน้าแรก
+    function goBack() {
+      stopPolling();
+      currentPaymentId = null;
+      inputSection.style.display = 'block';
+      paymentSection.classList.remove('active');
+      qrImage.src = '';
+      errorMessage.style.display = 'none';
+    }
+    
+    // Event Listeners
+    payBtn.addEventListener('click', createPayment);
+    backBtn.addEventListener('click', goBack);
+    
+    // Enter key to submit
+    amountInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') emailInput.focus();
+    });
+    
+    emailInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') descriptionInput.focus();
+    });
+    
+    descriptionInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') createPayment();
+    });
+  </script>
+</body>
+</html>
+

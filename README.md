@@ -14,6 +14,7 @@ MeCoins Wallet เป็นระบบกระเป๋าเงินดิ�
 - 💳 **ระบบโอนเงิน** - โอน coins ระหว่างผู้ใช้
 - 📊 **ระบบธุรกรรม** - ติดตามประวัติการทำธุรกรรม
 - 🛒 **ร้านค้าไอเทม** - ระบบ CRUD สำหรับไอเทมในเกม
+- 💳 **ระบบชำระเงิน Stripe PromptPay** - ✨ **ใหม่!** รับชำระเงินผ่าน QR Code PromptPay
 
 ## คำสั่ง Discord
 - `/register` - ลงทะเบียนบัญชี Discord
@@ -43,10 +44,22 @@ $ npm run start:dev
 
 ## เทคโนโลยีที่ใช้
 - **Backend**: NestJS, TypeScript
-- **Database**: Prisma ORM
+- **Database**: Prisma ORM (MongoDB)
 - **Authentication**: JWT, Passport
 - **Discord Bot**: Discord.js, Necord
+- **Payment**: Stripe (PromptPay)
 - **Documentation**: Swagger/OpenAPI
+
+## 📚 เอกสารเพิ่มเติม
+
+### ระบบชำระเงิน Stripe PromptPay
+- **[STRIPE_PROMPTPAY_README.md](./STRIPE_PROMPTPAY_README.md)** - คู่มือเริ่มต้นใช้งาน (สำหรับผู้ใช้งานทั่วไป)
+- **[PAYMENT_INTEGRATION_GUIDE.md](./PAYMENT_INTEGRATION_GUIDE.md)** - คู่มือเชื่อมต่อ API (สำหรับนักพัฒนา)
+- **[หน้าเว็บตัวอย่าง](./public/payment-example.html)** - UI สำหรับทดสอบชำระเงิน
+
+### ระบบอื่นๆ
+- **[GIFT_SYSTEM_README.md](./GIFT_SYSTEM_README.md)** - ระบบของขวัญ Discord
+- **[THAI_TRANSLATION_SUMMARY.md](./THAI_TRANSLATION_SUMMARY.md)** - สรุปการแปลภาษาไทย
 
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
 [circleci-url]: https://circleci.com/gh/nestjs/nest

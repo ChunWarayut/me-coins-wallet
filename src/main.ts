@@ -4,9 +4,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as morgan from 'morgan';
 import chalk from 'chalk';
+import { json } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true, // เปิดใช้งาน raw body สำหรับ webhook
+  });
+  
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.enableCors();
 

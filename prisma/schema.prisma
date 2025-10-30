@@ -25,6 +25,7 @@ model User {
   ownedItems    OwnedItem[]
   sentTransfers Transfer[]    @relation("SentTransfers")
   receivedTransfers Transfer[] @relation("ReceivedTransfers")
+  payments      Payment[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   Transaction   Transaction[]
@@ -233,4 +234,31 @@ enum TransferStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+model Payment {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  stripePaymentIntentId String    @unique
+  amount            Int           // จำนวนเงินในหน่วยสตางค์
+  currency          String        @default("thb")
+  status            PaymentStatus @default(PENDING)
+  description       String?
+  metadata          Json?         // เก็บข้อมูลเพิ่มเติม เช่น orderId, userId
+  qrCodeUrl         String?
+  userId            String?       @db.ObjectId
+  user              User?         @relation(fields: [userId], references: [id])
+  paidAt            DateTime?     // เวลาที่ชำระเงินสำเร็จ
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING           // รอการชำระเงิน
+  REQUIRES_ACTION   // รอลูกค้าสแกน QR
+  PROCESSING        // กำลังประมวลผล
+  SUCCEEDED         // ชำระเงินสำเร็จ
+  FAILED            // ล้มเหลว
+  CANCELED          // ยกเลิก
 }
