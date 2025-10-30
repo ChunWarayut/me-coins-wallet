@@ -139,7 +139,7 @@ export class TransfersService {
     const { receiverAccountNumber, amount, comment } = createTransferDto;
 
     // Get sender's user and wallet
-    const sender = await this.prisma.user.findUnique({
+    const sender = await this.prisma.user.findFirst({
       where: { discordId },
       include: { wallet: true },
     });

@@ -5,6 +5,8 @@ import {
   Body,
   Param,
   Req,
+  Res,
+  Header,
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -13,7 +15,8 @@ import {
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentIntentDto } from './dto/create-intent.dto';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { join } from 'path';
 
 @Controller('payments')
 export class PaymentsController {
@@ -26,6 +29,9 @@ export class PaymentsController {
   }
 
   @Get(':id')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   async getPaymentStatus(@Param('id') id: string) {
     return this.paymentsService.getPaymentIntentStatus(id);
   }
@@ -52,6 +58,15 @@ export class PaymentsController {
     );
 
     return this.paymentsService.handleWebhookEvent(event);
+  }
+}
+
+// Controller สำหรับ serve หน้า payment UI
+@Controller('payment')
+export class PaymentPageController {
+  @Get(':id')
+  servePage(@Param('id') id: string, @Res() res: Response) {
+    return res.sendFile(join(process.cwd(), 'public', 'payment.html'));
   }
 }
 

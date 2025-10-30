@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ชำระเงิน - PromptPay</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .payment-info {
+      background: #f7f9fc;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    
+    .payment-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    
+    .payment-info-row:last-child {
+      margin-bottom: 0;
+      padding-top: 12px;
+      border-top: 2px solid #e1e8ed;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .payment-info-label {
+      color: #666;
+    }
+    
+    .payment-info-value {
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .qr-container {
+      background: white;
+      border: 2px solid #e1e8ed;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      display: inline-block;
+    }
+    
+    .qr-container img {
+      max-width: 280px;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    .instructions {
+      color: #666;
+      font-size: 14px;
+      margin: 20px 0;
+      line-height: 1.6;
+    }
+    
+    .status {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-size: 16px;
+      font-weight: 600;
+      margin: 20px 0;
+    }
+    
+    .status.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .status.succeeded {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status.failed {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    
+    .btn {
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      margin-top: 20px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    
+    .btn-secondary {
+      background: #f7f9fc;
+      color: #667eea;
+      margin-left: 10px;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💳 ชำระเงิน</h1>
+    <p class="subtitle">ชำระผ่าน PromptPay</p>
+    
+    <div id="loadingSection">
+      <!-- <div class="loading" style="width: 40px; height: 40px;"></div> -->
+      <p style="margin-top: 20px; color: #666;">กำลังโหลดข้อมูลการชำระเงิน...</p>
+    </div>
+    
+    <div id="paymentSection" class="hidden">
+      <div class="payment-info">
+        <div class="payment-info-row">
+          <span class="payment-info-label">รายการ:</span>
+          <span class="payment-info-value" id="description">-</span>
+        </div>
+        <div class="payment-info-row">
+          <span class="payment-info-label">Payment ID:</span>
+          <span class="payment-info-value" id="paymentId" style="font-size: 11px; word-break: break-all;">-</span>
+        </div>
+        <div class="payment-info-row">
+          <span class="payment-info-label">ยอดชำระ:</span>
+          <span class="payment-info-value" id="amount">-</span>
+        </div>
+      </div>
+      
+      <div class="qr-container" id="qrContainer">
+        <img id="qrImage" src="" alt="QR Code PromptPay" />
+      </div>
+      
+      <div class="instructions">
+        📱 สแกน QR Code ด้วยแอปธนาคารของคุณ<br>
+        เพื่อชำระเงินผ่าน PromptPay
+      </div>
+      
+      <div class="status pending" id="statusBadge">
+        <!-- <span class="loading"></span> -->
+        <span id="statusText">กำลังรอการชำระเงิน...</span>
+      </div>
+      
+      <div id="successSection" class="hidden">
+        <p style="color: #155724; font-size: 18px; margin: 20px 0;">
+          ✅ ชำระเงินสำเร็จ! กำลัง redirect กลับ...
+        </p>
+      </div>
+    </div>
+    
+    <div id="errorSection" class="hidden">
+      <div class="error-message" id="errorMessage"></div>
+      <a href="/" class="btn">กลับหน้าแรก</a>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_URL = window.location.origin;
+    
+    // ดึง Payment Intent ID จาก URL
+    const pathParts = window.location.pathname.split('/');
+    const paymentIntentId = pathParts[pathParts.length - 1];
+    
+    let pollInterval = null;
+    let callbackUrl = null;
+    let cancelUrl = null;
+    
+    // โหลดข้อมูล Payment Intent
+    async function loadPaymentData() {
+      try {
+        if (!paymentIntentId || paymentIntentId === 'payment') {
+          throw new Error('Payment ID not found in URL');
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/payments/${paymentIntentId}?t=${Date.now()}`, { cache: 'no-store' });
+        
+        if (!response.ok) {
+          throw new Error('ไม่พบข้อมูลการชำระเงิน');
+        }
+        
+        const data = await response.json();
+        
+        // ดึง callback URLs จาก metadata
+        if (data.metadata) {
+          callbackUrl = data.metadata.callbackUrl;
+          cancelUrl = data.metadata.cancelUrl;
+        }
+        
+        // แสดงข้อมูล
+        document.getElementById('description').textContent = data.description || 'ชำระเงิน';
+        document.getElementById('paymentId').textContent = data.id;
+        document.getElementById('amount').textContent = `${(data.amount / 100).toFixed(2)} THB`;
+        
+        // ถ้าชำระเงินสำเร็จแล้ว
+        if (data.status === 'succeeded') {
+          showSuccess();
+          setTimeout(() => redirectToCallback('success'), 2000);
+          return;
+        }
+        
+        // ถ้ายกเลิกแล้ว
+        if (data.status === 'canceled') {
+          showError('การชำระเงินถูกยกเลิก');
+          setTimeout(() => redirectToCallback('cancel'), 3000);
+          return;
+        }
+        
+        // แสดงหน้าชำระเงิน
+        document.getElementById('loadingSection').classList.add('hidden');
+        document.getElementById('paymentSection').classList.remove('hidden');
+        
+        // โหลด QR Code
+        await loadQRCode();
+        
+        // เริ่มโพลสถานะ
+        startPolling();
+        
+      } catch (error) {
+        console.error('Error:', error);
+        showError(error.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
+      }
+    }
+    
+    // โหลด QR Code จาก database
+    async function loadQRCode() {
+      try {
+        // ดึง QR URL จาก metadata ที่เก็บไว้
+        const response = await fetch(`${API_BASE_URL}/payments/${paymentIntentId}?t=${Date.now()}`, { cache: 'no-store' });
+        
+        if (!response.ok) {
+          throw new Error('ไม่สามารถโหลด QR Code ได้');
+        }
+        
+        const data = await response.json();
+        console.log('Payment data:', data); // Debug log
+        
+        // ลองหา QR URL จากหลายที่
+        let qrUrl = null;
+        
+        // 1. ลองดึงจาก qrCodeUrl field โดยตรง
+        if (data.qrCodeUrl) {
+          qrUrl = data.qrCodeUrl;
+        }
+        // 2. ลองดึงจาก metadata.qrCodeUrl
+        else if (data.metadata && data.metadata.qrCodeUrl) {
+          qrUrl = data.metadata.qrCodeUrl;
+        }
+        
+        if (qrUrl) {
+          const qrImage = document.getElementById('qrImage');
+          qrImage.src = qrUrl;
+          qrImage.style.display = 'block';
+          console.log('QR Code loaded:', qrUrl);
+        } else {
+          // ถ้าไม่มี ให้แสดง message
+          console.warn('No QR Code URL found in response');
+          document.getElementById('qrContainer').innerHTML = 
+            '<p style="color: #666; padding: 20px;">QR Code ไม่สามารถแสดงได้<br>กรุณาชำระเงินผ่าน Payment ID ด้านบน<br><small>(กรุณาใช้ Live Mode ของ Stripe)</small></p>';
+        }
+          
+      } catch (error) {
+        console.error('Error loading QR:', error);
+        document.getElementById('qrContainer').innerHTML = 
+          '<p style="color: #f44336; padding: 20px;">⚠️ ไม่สามารถโหลด QR Code ได้<br>กรุณาลองอีกครั้ง</p>';
+      }
+    }
+    
+    // ตรวจสอบสถานะการชำระเงิน
+    async function checkPaymentStatus() {
+      try {
+        console.log(`[${new Date().toISOString()}] Checking payment status...`);
+        const response = await fetch(`${API_BASE_URL}/payments/${paymentIntentId}`);
+        
+        if (!response.ok) {
+          console.error('Response not OK:', response.status);
+          return;
+        }
+        
+        const data = await response.json();
+        console.log('Payment status:', data.status, 'Full data:', data);
+        
+        // อัปเดตสถานะ
+        updateStatusUI(data.status);
+        
+        // ถ้าชำระเงินสำเร็จ
+        if (data.status === 'succeeded') {
+          console.log('✅ Payment succeeded! Redirecting...');
+          stopPolling();
+          showSuccess();
+          setTimeout(() => redirectToCallback('success', data), 2000);
+        }
+        
+        // ถ้ายกเลิกหรือล้มเหลว
+        if (['canceled', 'requires_payment_method'].includes(data.status)) {
+          console.warn('❌ Payment failed or canceled');
+          stopPolling();
+          showError('การชำระเงินไม่สำเร็จ');
+          setTimeout(() => redirectToCallback('cancel'), 3000);
+        }
+        
+      } catch (error) {
+        console.error('Error checking status:', error);
+      }
+    }
+    
+    // อัปเดต UI ตามสถานะ
+    function updateStatusUI(status) {
+      const statusBadge = document.getElementById('statusBadge');
+      const statusText = document.getElementById('statusText');
+      
+      statusBadge.className = 'status';
+      
+      switch (status) {
+        case 'succeeded':
+          statusBadge.classList.add('succeeded');
+          statusText.innerHTML = '✅ ชำระเงินสำเร็จ!';
+          break;
+        case 'requires_action':
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = '<span class="loading"></span> กำลังรอการชำระเงิน...';
+          break;
+        case 'processing':
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = '<span class="loading"></span> กำลังประมวลผล...';
+          break;
+        default:
+          statusBadge.classList.add('pending');
+          statusText.innerHTML = `สถานะ: ${status}`;
+      }
+    }
+    
+    // แสดงความสำเร็จ
+    function showSuccess() {
+      document.getElementById('qrContainer').classList.add('hidden');
+      document.getElementById('statusBadge').classList.add('hidden');
+      document.getElementById('successSection').classList.remove('hidden');
+    }
+    
+    // แสดงข้อผิดพลาด
+    function showError(message) {
+      document.getElementById('loadingSection').classList.add('hidden');
+      document.getElementById('paymentSection').classList.add('hidden');
+      document.getElementById('errorSection').classList.remove('hidden');
+      document.getElementById('errorMessage').textContent = message;
+    }
+    
+    // Redirect กลับไปยังต้นทาง
+    function redirectToCallback(status, data = {}) {
+      const targetUrl = status === 'success' ? callbackUrl : cancelUrl;
+      
+      if (!targetUrl) {
+        console.log('No callback URL specified');
+        return;
+      }
+      
+      // เพิ่ม query parameters
+      const url = new URL(targetUrl);
+      url.searchParams.set('payment_id', paymentIntentId);
+      url.searchParams.set('status', status);
+      
+      if (status === 'success' && data.amount) {
+        url.searchParams.set('amount', data.amount);
+      }
+      
+      console.log('Redirecting to:', url.toString());
+      window.location.href = url.toString();
+    }
+    
+    // เริ่มโพลสถานะ
+    function startPolling() {
+      // ป้องกัน polling ซ้ำ
+      if (pollInterval) {
+        console.warn('Polling already started, skipping...');
+        return;
+      }
+      
+      console.log('Starting polling every 3 seconds...');
+      checkPaymentStatus();
+      pollInterval = setInterval(checkPaymentStatus, 3000);
+      
+      // หยุดโพลหลัง 10 นาที
+      setTimeout(() => {
+        if (pollInterval) {
+          stopPolling();
+          showError('หมดเวลารอการชำระเงิน');
+        }
+      }, 600000);
+    }
+    
+    // หยุดโพลสถานะ
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+    
+    // โหลดข้อมูลเมื่อโหลดหน้าเสร็จ
+    window.addEventListener('DOMContentLoaded', loadPaymentData);
+  </script>
+</body>
+</html>
+

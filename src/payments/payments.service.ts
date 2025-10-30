@@ -22,7 +22,15 @@ export class PaymentsService {
 
   async createPaymentIntent(dto: CreatePaymentIntentDto) {
     try {
-      const { amount, currency = 'thb', description, email, metadata } = dto;
+      const {
+        amount,
+        currency = 'thb',
+        description,
+        email,
+        callbackUrl,
+        cancelUrl,
+        metadata,
+      } = dto;
 
       this.logger.log(`Creating PaymentIntent: ${amount} ${currency}`);
 
@@ -88,10 +96,17 @@ export class PaymentsService {
         );
       }
 
-      // บันทึกลงฐานข้อมูล
+      // บันทึกลงฐานข้อมูล (รวม callback URLs และ QR URL)
       const metadataJson = metadata
         ? JSON.parse(JSON.stringify(metadata))
         : null;
+      const enhancedMetadata = {
+        ...metadataJson,
+        callbackUrl: callbackUrl || null,
+        cancelUrl: cancelUrl || null,
+        qrCodeUrl: qrCodeUrl || null, // เพิ่ม QR URL ใน metadata เพื่อให้หน้า payment.html ดึงได้
+      };
+
       await this.prisma['payment'].create({
         data: {
           stripePaymentIntentId: paymentIntent.id,
@@ -99,7 +114,7 @@ export class PaymentsService {
           currency: paymentIntent.currency,
           status: this.mapStripeStatusToPaymentStatus(paymentIntent.status),
           description: description || null,
-          metadata: metadataJson,
+          metadata: enhancedMetadata,
           qrCodeUrl: qrCodeUrl,
           userId: metadata?.userId || null,
         },
@@ -114,6 +129,10 @@ export class PaymentsService {
         );
       }
 
+      // สร้าง payment URL สำหรับ redirect
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+      const paymentUrl = `${baseUrl}/payment/${paymentIntent.id}`;
+
       return {
         paymentIntentId: paymentIntent.id,
         clientSecret: paymentIntent.client_secret,
@@ -121,6 +140,7 @@ export class PaymentsService {
         amount: paymentIntent.amount,
         currency: paymentIntent.currency,
         qr: qrData,
+        paymentUrl: paymentUrl, // URL สำหรับ redirect ไปหน้าชำระเงิน
         error:
           !qrData && paymentIntent.status === 'requires_action'
             ? 'QR Code not available. Please check: 1) Use Live Mode instead of Test Mode, 2) Ensure Stripe account supports PromptPay in Thailand'
@@ -153,6 +173,9 @@ export class PaymentsService {
           paymentIntent.status,
         );
         if (updatedStatus !== localPayment.status) {
+          this.logger.log(
+            `Status changed: ${localPayment.status} -> ${updatedStatus} for ${paymentIntentId}`,
+          );
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (this.prisma as any).payment.update({
             where: { stripePaymentIntentId: paymentIntentId },
@@ -164,6 +187,9 @@ export class PaymentsService {
                   : localPayment.paidAt,
             },
           });
+          
+          // อัปเดต localPayment สำหรับ return
+          localPayment.status = updatedStatus;
         }
 
         return {
@@ -172,7 +198,8 @@ export class PaymentsService {
           amount: paymentIntent.amount,
           currency: paymentIntent.currency,
           description: paymentIntent.description,
-          metadata: paymentIntent.metadata,
+          metadata: localPayment?.metadata || paymentIntent.metadata, // ใช้ metadata จาก DB (มี callback URLs)
+          qrCodeUrl: localPayment?.qrCodeUrl, // เพิ่ม QR Code URL
         };
       }
 
@@ -185,6 +212,7 @@ export class PaymentsService {
           currency: localPayment.currency,
           description: localPayment.description,
           metadata: localPayment.metadata,
+          qrCodeUrl: localPayment.qrCodeUrl, // เพิ่ม QR Code URL
         };
       }
 
@@ -199,6 +227,7 @@ export class PaymentsService {
         currency: paymentIntent.currency,
         description: paymentIntent.description,
         metadata: paymentIntent.metadata,
+        qrCodeUrl: null, // ไม่มี QR ถ้าดึงจาก Stripe โดยตรง
       };
     } catch (error) {
       this.logger.error(

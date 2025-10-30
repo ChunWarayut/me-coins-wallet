@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo - ระบบชำระเงิน Callback</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+    
+    .content {
+      background: white;
+      padding: 40px;
+      border-radius: 0 0 20px 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    .demo-section {
+      background: #f7f9fc;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+    }
+    
+    .demo-section h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .demo-section h2::before {
+      content: '🛍️';
+      margin-right: 10px;
+      font-size: 24px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      color: #555;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e1e8ed;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: border-color 0.3s;
+      font-family: inherit;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .form-group small {
+      display: block;
+      color: #999;
+      margin-top: 5px;
+      font-size: 13px;
+    }
+    
+    .amount-display {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      border: 2px solid #667eea;
+    }
+    
+    .amount-display .label {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    
+    .amount-display .value {
+      color: #667eea;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 10px;
+    }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .info-box {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .info-box h3 {
+      color: #1976d2;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    
+    .info-box p {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 5px 0;
+    }
+    
+    .response-box {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      display: none;
+    }
+    
+    .response-box.show {
+      display: block;
+    }
+    
+    .response-box pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .step-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      border: 2px solid #e1e8ed;
+    }
+    
+    .step {
+      flex: 1;
+      text-align: center;
+      padding: 15px;
+      position: relative;
+    }
+    
+    .step::after {
+      content: '→';
+      position: absolute;
+      right: -20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #ccc;
+      font-size: 20px;
+    }
+    
+    .step:last-child::after {
+      display: none;
+    }
+    
+    .step-number {
+      width: 40px;
+      height: 40px;
+      background: #e1e8ed;
+      color: #999;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .step.active .step-number {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .step-label {
+      font-size: 12px;
+      color: #666;
+      font-weight: 600;
+    }
+    
+    .callback-demo {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 30px;
+    }
+    
+    .callback-demo h3 {
+      color: #856404;
+      margin-bottom: 15px;
+    }
+    
+    .callback-demo p {
+      color: #856404;
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+    
+    .callback-demo code {
+      background: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #d63384;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 Demo - ระบบชำระเงิน Callback</h1>
+      <p>ทดสอบการทำงานแบบเต็มรูปแบบ: สร้าง Payment → Redirect → Callback</p>
+    </div>
+    
+    <div class="content">
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <div class="step active" id="step1">
+          <div class="step-number">1</div>
+          <div class="step-label">กรอกข้อมูล</div>
+        </div>
+        <div class="step" id="step2">
+          <div class="step-number">2</div>
+          <div class="step-label">สร้าง Payment</div>
+        </div>
+        <div class="step" id="step3">
+          <div class="step-number">3</div>
+          <div class="step-label">ชำระเงิน</div>
+        </div>
+        <div class="step" id="step4">
+          <div class="step-number">4</div>
+          <div class="step-label">Callback</div>
+        </div>
+      </div>
+      
+      <!-- Demo Form -->
+      <div class="demo-section">
+        <h2>สร้างรายการสั่งซื้อ (จำลอง E-commerce)</h2>
+        
+        <div class="form-group">
+          <label for="orderId">Order ID</label>
+          <input type="text" id="orderId" value="ORD-2025-001" />
+          <small>หมายเลขคำสั่งซื้อของคุณ</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="productName">สินค้า</label>
+          <input type="text" id="productName" value="iPhone 15 Pro Max 256GB" />
+        </div>
+        
+        <div class="form-group">
+          <label for="amount">จำนวนเงิน (บาท)</label>
+          <input type="number" id="amount" value="100" min="1" step="0.01" />
+          <div class="amount-display">
+            <div class="label">จำนวนที่ต้องชำระ:</div>
+            <div class="value" id="displayAmount">100.00 THB</div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="email">อีเมล (สำหรับการคืนเงิน)</label>
+          <input type="email" id="email" value="humansaees0@gmail.com" />
+        </div>
+        
+        <div class="form-group">
+          <label for="callbackUrl">Success Callback URL</label>
+          <input type="url" id="callbackUrl" value="http://localhost:3000/demo-success.html" />
+          <small>URL ที่จะ redirect กลับมาเมื่อชำระเงินสำเร็จ</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="cancelUrl">Cancel Callback URL</label>
+          <input type="url" id="cancelUrl" value="http://localhost:3000/demo-cancel.html" />
+          <small>URL ที่จะ redirect กลับมาเมื่อยกเลิก</small>
+        </div>
+        
+        <button id="payBtn" class="btn">🚀 ชำระเงินทันที</button>
+      </div>
+      
+      <!-- Info Box -->
+      <div class="info-box">
+        <h3>💡 ขั้นตอนการทำงาน</h3>
+        <p><strong>1. กดปุ่ม "ชำระเงินทันที"</strong> → ระบบจะสร้าง Payment Intent</p>
+        <p><strong>2. Redirect อัตโนมัติ</strong> → ไปยังหน้าชำระเงินส่วนกลาง (แสดง QR Code)</p>
+        <p><strong>3. สแกน QR และชำระเงิน</strong> → ระบบจะ auto-poll สถานะทุก 3 วินาที</p>
+        <p><strong>4. Callback กลับมา</strong> → เมื่อชำระสำเร็จจะ redirect กลับมาที่ Success URL พร้อม payment_id</p>
+      </div>
+      
+      <!-- Response Box -->
+      <div class="response-box" id="responseBox">
+        <pre id="responseText"></pre>
+      </div>
+      
+      <!-- Callback Demo -->
+      <div class="callback-demo">
+        <h3>📋 ตัวอย่าง Callback URL ที่จะได้รับ</h3>
+        <p><strong>Success:</strong></p>
+        <p><code>http://localhost:3000/demo-success.html?payment_id=pi_xxxxx&status=success&amount=10000</code></p>
+        <p style="margin-top: 15px;"><strong>Cancel:</strong></p>
+        <p><code>http://localhost:3000/demo-cancel.html?payment_id=pi_xxxxx&status=cancel</code></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:3000';
+    
+    const amountInput = document.getElementById('amount');
+    const displayAmount = document.getElementById('displayAmount');
+    const payBtn = document.getElementById('payBtn');
+    const responseBox = document.getElementById('responseBox');
+    const responseText = document.getElementById('responseText');
+    
+    // อัปเดตจำนวนเงินที่แสดง
+    amountInput.addEventListener('input', () => {
+      const amount = parseFloat(amountInput.value) || 0;
+      displayAmount.textContent = `${amount.toFixed(2)} THB`;
+    });
+    
+    // ฟังก์ชันเปลี่ยน step indicator
+    function setActiveStep(stepNumber) {
+      for (let i = 1; i <= 4; i++) {
+        const step = document.getElementById(`step${i}`);
+        if (i <= stepNumber) {
+          step.classList.add('active');
+        } else {
+          step.classList.remove('active');
+        }
+      }
+    }
+    
+    // ฟังก์ชันแสดง response
+    function showResponse(data, title = 'API Response') {
+      responseText.textContent = `// ${title}\n` + JSON.stringify(data, null, 2);
+      responseBox.classList.add('show');
+    }
+    
+    // ฟังก์ชันสร้าง Payment และ Redirect
+    async function createPaymentAndRedirect() {
+      const orderId = document.getElementById('orderId').value;
+      const productName = document.getElementById('productName').value;
+      const amount = parseFloat(amountInput.value);
+      const email = document.getElementById('email').value;
+      const callbackUrl = document.getElementById('callbackUrl').value;
+      const cancelUrl = document.getElementById('cancelUrl').value;
+      
+      // Validation
+      if (isNaN(amount) || amount < 1) {
+        alert('กรุณากรอกจำนวนเงินที่ถูกต้อง (ขั้นต่ำ 1 บาท)');
+        return;
+      }
+      
+      if (!email || !email.includes('@')) {
+        alert('กรุณากรอกอีเมลที่ถูกต้อง');
+        return;
+      }
+      
+      if (!callbackUrl || !callbackUrl.startsWith('http')) {
+        alert('กรุณากรอก Callback URL ที่ถูกต้อง');
+        return;
+      }
+      
+      // เปลี่ยน step
+      setActiveStep(2);
+      
+      // Disable button และแสดง loading
+      payBtn.disabled = true;
+      payBtn.innerHTML = '<span class="loading"></span> กำลังสร้างรายการชำระเงิน...';
+      
+      try {
+        // สร้าง Payment Intent
+        const response = await fetch(`${API_BASE_URL}/payments/intents`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: Math.round(amount * 100), // แปลงเป็นสตางค์
+            currency: 'thb',
+            email: email,
+            description: `${productName} (Order: ${orderId})`,
+            callbackUrl: callbackUrl,
+            cancelUrl: cancelUrl,
+            metadata: {
+              orderId: orderId,
+              productName: productName,
+              source: 'demo-callback',
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'ไม่สามารถสร้างรายการชำระเงินได้');
+        }
+        
+        const data = await response.json();
+        
+        // แสดง response
+        showResponse(data, 'Payment Intent Created');
+        
+        // เปลี่ยน step
+        setActiveStep(3);
+        
+        // Redirect หลัง 2 วินาที
+        payBtn.innerHTML = '✅ สำเร็จ! กำลัง redirect...';
+        
+        setTimeout(() => {
+          console.log('Redirecting to:', data.paymentUrl);
+          window.location.href = data.paymentUrl;
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Error:', error);
+        alert('เกิดข้อผิดพลาด: ' + error.message);
+        
+        payBtn.disabled = false;
+        payBtn.innerHTML = '🚀 ชำระเงินทันที';
+        setActiveStep(1);
+      }
+    }
+    
+    // Event Listener
+    payBtn.addEventListener('click', createPaymentAndRedirect);
+    
+    // Enter to submit
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !payBtn.disabled) {
+        createPaymentAndRedirect();
+      }
+    });
+  </script>
+</body>
+</html>
+

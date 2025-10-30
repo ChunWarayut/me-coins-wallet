@@ -18,6 +18,14 @@ export class CreatePaymentIntentDto {
   email?: string; // Email สำหรับ PromptPay (จำเป็นสำหรับการ refund)
 
   @IsOptional()
+  @IsString()
+  callbackUrl?: string; // URL สำหรับ redirect กลับหลังชำระเงินสำเร็จ (absolute หรือ relative)
+
+  @IsOptional()
+  @IsString()
+  cancelUrl?: string; // URL สำหรับ redirect เมื่อยกเลิก (absolute หรือ relative)
+
+  @IsOptional()
   @IsObject()
   metadata?: Record<string, string>;
 }

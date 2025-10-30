@@ -45,14 +45,14 @@ export class DiscordCommands {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: RegisterDto,
   ) {
-    const existingUser = await this.prisma.user.findUnique({
+    const existingUser = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
     });
     const hashedPassword = await bcrypt.hash(options.password, 10);
 
     if (existingUser) {
       await this.prisma.user.update({
-        where: { discordId: interaction.user.id },
+        where: { id: existingUser.id },
         data: {
           username: options.username,
           password: hashedPassword,
@@ -112,7 +112,7 @@ export class DiscordCommands {
     description: 'ตรวจสอบยอดเงินในกระเป๋าของคุณ',
   })
   public async onBalance(@Context() [interaction]: SlashCommandContext) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
       include: { wallet: true },
     });
@@ -143,7 +143,7 @@ export class DiscordCommands {
     description: 'ดูเลขบัญชีธนาคารของคุณ',
   })
   public async onBankNumber(@Context() [interaction]: SlashCommandContext) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
     });
 
@@ -420,7 +420,7 @@ export class DiscordCommands {
     }
 
     // Get the sender's user and wallet
-    const sender = await this.prisma.user.findUnique({
+    const sender = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
       include: { wallet: true },
     });
@@ -433,7 +433,7 @@ export class DiscordCommands {
     }
 
     // Get the recipient's user
-    const recipient = await this.prisma.user.findUnique({
+    const recipient = await this.prisma.user.findFirst({
       where: { discordId: recipientId },
     });
 
@@ -582,7 +582,7 @@ export class DiscordCommands {
     }
 
     // Get the sender's user and wallet
-    const sender = await this.prisma.user.findUnique({
+    const sender = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
       include: { wallet: true },
     });
@@ -595,7 +595,7 @@ export class DiscordCommands {
     }
 
     // Get the recipient's user
-    const recipient = await this.prisma.user.findUnique({
+    const recipient = await this.prisma.user.findFirst({
       where: { discordId: recipientId },
     });
 
@@ -709,7 +709,7 @@ export class DiscordCommands {
     description: 'ดูรายการของขวัญทั้งหมดที่คุณได้รับ',
   })
   public async onMyGifts(@Context() [interaction]: SlashCommandContext) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
     });
 
@@ -781,7 +781,7 @@ export class DiscordCommands {
     description: 'ดูรายการไอเทมทั้งหมดที่คุณมีในครอบครอง',
   })
   public async onMyInventory(@Context() [interaction]: SlashCommandContext) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: { discordId: interaction.user.id },
     });
 
