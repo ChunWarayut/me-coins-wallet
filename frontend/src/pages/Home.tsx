@@ -6,6 +6,8 @@ export default function Home() {
   const [amount, setAmount] = useState(10);
   const [email, setEmail] = useState('humansaees0@gmail.com');
   const [description, setDescription] = useState('Demo Payment from React');
+  const [callbackUrl, setCallbackUrl] = useState(`${location.origin}/success`);
+  const [cancelUrl, setCancelUrl] = useState(`${location.origin}/cancel`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,8 +32,8 @@ export default function Home() {
         amount: Math.round(amount * 100),
         email,
         description,
-        callbackUrl: `${location.origin}/success`,
-        cancelUrl: `${location.origin}/cancel`,
+        callbackUrl,
+        cancelUrl,
         metadata: { source: 'react-demo' }
       });
 
@@ -76,6 +78,26 @@ export default function Home() {
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="callbackUrl">Callback URL</label>
+            <input
+              id="callbackUrl"
+              type="text"
+              value={callbackUrl}
+              onChange={(e) => setCallbackUrl(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="cancelUrl">Cancel URL</label>
+            <input
+              id="cancelUrl"
+              type="text"
+              value={cancelUrl}
+              onChange={(e) => setCancelUrl(e.target.value)}
             />
           </div>
 
