@@ -14,6 +14,7 @@ export interface Payment {
   currency: string;
   description?: string;
   qrCodeUrl?: string;
+  callbackSignature?: string;
   metadata?: {
     qrCodeUrl?: string;
     callbackUrl?: string;
@@ -48,4 +49,3 @@ export const getPaymentStatus = async (id: string): Promise<Payment> => {
 
   return response.json();
 };
-

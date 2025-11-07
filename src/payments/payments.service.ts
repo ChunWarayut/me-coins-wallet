@@ -2,11 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
 import { CreatePaymentIntentDto } from './dto/create-intent.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { createHmac } from 'crypto';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly stripe: Stripe;
+  private readonly callbackSecret?: string;
 
   constructor(private readonly prisma: PrismaService) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -18,6 +20,12 @@ export class PaymentsService {
     this.stripe = new Stripe(secretKey, {
       apiVersion: '2025-10-29.clover',
     });
+    this.callbackSecret = process.env.CALLBACK_SIGNATURE_SECRET;
+    if (!this.callbackSecret) {
+      this.logger.warn(
+        'CALLBACK_SIGNATURE_SECRET is not configured; callback redirects will not be signed.',
+      );
+    }
   }
 
   async createPaymentIntent(dto: CreatePaymentIntentDto) {
@@ -192,7 +200,7 @@ export class PaymentsService {
           localPayment.status = updatedStatus;
         }
 
-        return {
+        return this.attachCallbackSignature({
           id: paymentIntent.id,
           status: paymentIntent.status,
           amount: paymentIntent.amount,
@@ -200,12 +208,12 @@ export class PaymentsService {
           description: paymentIntent.description,
           metadata: localPayment?.metadata || paymentIntent.metadata, // ใช้ metadata จาก DB (มี callback URLs)
           qrCodeUrl: localPayment?.qrCodeUrl, // เพิ่ม QR Code URL
-        };
+        });
       }
 
       // ถ้าสถานะเสร็จสิ้นแล้ว ใช้ข้อมูลจากฐานข้อมูล
       if (localPayment) {
-        return {
+        return this.attachCallbackSignature({
           id: localPayment.stripePaymentIntentId,
           status: this.mapPaymentStatusToStripeStatus(localPayment.status),
           amount: localPayment.amount,
@@ -213,14 +221,14 @@ export class PaymentsService {
           description: localPayment.description,
           metadata: localPayment.metadata,
           qrCodeUrl: localPayment.qrCodeUrl, // เพิ่ม QR Code URL
-        };
+        });
       }
 
       // ถ้าไม่มีในฐานข้อมูล ดึงจาก Stripe
       const paymentIntent =
         await this.stripe.paymentIntents.retrieve(paymentIntentId);
 
-      return {
+      return this.attachCallbackSignature({
         id: paymentIntent.id,
         status: paymentIntent.status,
         amount: paymentIntent.amount,
@@ -228,7 +236,7 @@ export class PaymentsService {
         description: paymentIntent.description,
         metadata: paymentIntent.metadata,
         qrCodeUrl: null, // ไม่มี QR ถ้าดึงจาก Stripe โดยตรง
-      };
+      });
     } catch (error) {
       this.logger.error(
         `Failed to retrieve PaymentIntent: ${paymentIntentId}`,
@@ -369,5 +377,22 @@ export class PaymentsService {
       default:
         return 'requires_confirmation';
     }
+  }
+
+  private attachCallbackSignature<T extends { id: string; amount: number }>(
+    payload: T,
+  ): T & { callbackSignature?: string } {
+    if (!this.callbackSecret) {
+      return payload;
+    }
+
+    const hmac = createHmac('sha256', this.callbackSecret)
+      .update(`${payload.id}:${payload.amount}`)
+      .digest('hex');
+
+    return {
+      ...payload,
+      callbackSignature: hmac,
+    };
   }
 }

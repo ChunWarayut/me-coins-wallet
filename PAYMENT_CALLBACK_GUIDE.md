@@ -115,6 +115,7 @@ if (status === 'success') {
 | `payment_id` | string | Payment Intent ID | `pi_3xxxxxxxxxxxxxx` |
 | `status` | string | สถานะการชำระเงิน | `success` |
 | `amount` | number | จำนวนเงิน (สตางค์) | `10000` |
+| `signature` | string | HMAC-SHA256(`payment_id:amount`) ด้วย `CALLBACK_SIGNATURE_SECRET` | `e8c72a...` |
 
 ### Cancel Callback (`cancelUrl`)
 
@@ -122,6 +123,40 @@ if (status === 'success') {
 |-----------|------|-------------|---------|
 | `payment_id` | string | Payment Intent ID | `pi_3xxxxxxxxxxxxxx` |
 | `status` | string | สถานะ | `cancel` |
+| `amount` | number | จำนวนเงิน (สตางค์) | `10000` |
+| `signature` | string | HMAC-SHA256(`payment_id:amount`) ด้วย `CALLBACK_SIGNATURE_SECRET` | `e8c72a...` |
+
+> ⚙️ ตั้งค่า `CALLBACK_SIGNATURE_SECRET` ใน `.env` ของบริการนี้ก่อน เพื่อให้ระบบสร้างลายเซ็นให้ทุกครั้งที่เรียก `GET /payments/:id`
+
+### ตรวจสอบลายเซ็นบนระบบของคุณ
+
+ตัวอย่าง Node.js/Express สำหรับตรวจสอบลายเซ็น:
+
+```ts
+import { createHmac } from 'crypto';
+import type { Request, Response } from 'express';
+
+const CALLBACK_SIGNATURE_SECRET = process.env.CALLBACK_SIGNATURE_SECRET!;
+
+export const handlePaymentCallback = (req: Request, res: Response) => {
+  const { payment_id, status, amount, signature } = req.query;
+
+  if (!payment_id || !amount || !signature) {
+    return res.status(400).send('missing parameters');
+  }
+
+  const expected = createHmac('sha256', CALLBACK_SIGNATURE_SECRET)
+    .update(`${payment_id}:${amount}`)
+    .digest('hex');
+
+  if (expected !== signature) {
+    return res.status(403).send('invalid signature');
+  }
+
+  // ผ่านการตรวจสอบแล้ว: ไปยืนยันกับ backend/Stripe ต่อ
+  return res.send('ok');
+};
+```
 
 ---
 
@@ -439,4 +474,3 @@ BASE_URL=https://your-payment-api.com
 ## 🎉 พร้อมใช้งาน!
 
 ระบบชำระเงินแบบ Callback พร้อมใช้งานแล้ว สามารถ integrate กับระบบใดก็ได้ที่สามารถเรียก REST API และรับ redirect callback!
-

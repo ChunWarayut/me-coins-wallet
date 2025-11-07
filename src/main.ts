@@ -5,17 +5,16 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as morgan from 'morgan';
-import chalk from 'chalk';
 import { json } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true, // เปิดใช้งาน raw body สำหรับ webhook
   });
-  
+
   // Serve static files (React build)
   app.useStaticAssets(join(__dirname, '..', '..', 'public'));
-  
+
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.enableCors();
 
@@ -32,6 +31,6 @@ async function bootstrap() {
   app.use(morgan('combined'));
 
   await app.listen(3000);
-  console.log(chalk.green(`แอปพลิเคชันกำลังทำงานที่: ${await app.getUrl()}`));
+  console.log(`แอปพลิเคชันกำลังทำงานที่: ${await app.getUrl()}`);
 }
 bootstrap();

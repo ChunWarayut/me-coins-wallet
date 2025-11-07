@@ -241,6 +241,7 @@
     let pollInterval = null;
     let callbackUrl = null;
     let cancelUrl = null;
+    let callbackSignature = null;
     
     // โหลดข้อมูล Payment Intent
     async function loadPaymentData() {
@@ -256,6 +257,7 @@
         }
         
         const data = await response.json();
+        callbackSignature = data.callbackSignature || callbackSignature;
         
         // ดึง callback URLs จาก metadata
         if (data.metadata) {
@@ -310,6 +312,7 @@
         
         const data = await response.json();
         console.log('Payment data:', data); // Debug log
+        callbackSignature = data.callbackSignature || callbackSignature;
         
         // ลองหา QR URL จากหลายที่
         let qrUrl = null;
@@ -355,6 +358,7 @@
         
         const data = await response.json();
         console.log('Payment status:', data.status, 'Full data:', data);
+        callbackSignature = data.callbackSignature || callbackSignature;
         
         // อัปเดตสถานะ
         updateStatusUI(data.status);
@@ -435,8 +439,13 @@
       url.searchParams.set('payment_id', paymentIntentId);
       url.searchParams.set('status', status);
       
-      if (status === 'success' && data.amount) {
+      if (data.amount) {
         url.searchParams.set('amount', data.amount);
+      }
+
+      const signature = data.callbackSignature || callbackSignature;
+      if (signature) {
+        url.searchParams.set('signature', signature);
       }
       
       console.log('Redirecting to:', url.toString());
@@ -477,4 +486,3 @@
   </script>
 </body>
 </html>
-

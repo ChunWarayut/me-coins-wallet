@@ -46,6 +46,9 @@ export default function Payment() {
       url.searchParams.set('payment_id', data.id);
       url.searchParams.set('status', status);
       url.searchParams.set('amount', String(data.amount));
+      if (data.callbackSignature) {
+        url.searchParams.set('signature', data.callbackSignature);
+      }
 
       console.log('[Redirecting to]', url.toString());
       window.location.href = url.toString();
@@ -131,4 +134,3 @@ export default function Payment() {
     </div>
   );
 }
-
