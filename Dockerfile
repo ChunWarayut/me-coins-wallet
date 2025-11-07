@@ -6,14 +6,27 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files
+# Copy backend package files
 COPY package.json yarn.lock ./
+
+# Copy frontend package files
+COPY frontend/package.json frontend/package-lock.json ./frontend/
 
 # Install dependencies
 RUN yarn install --frozen-lockfile
 
+# Install frontend dependencies
+RUN cd frontend && npm ci
+
 # Copy source code
 COPY . .
+
+# Build frontend and sync assets into backend public directory
+RUN npm run build --prefix frontend \
+  && mkdir -p public \
+  && rm -rf public/assets \
+  && rm -f public/index.html \
+  && cp -R frontend/dist/. public/
 
 # Generate Prisma client
 RUN npx prisma generate
