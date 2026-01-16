@@ -14,7 +14,7 @@ export class CreateItemDto {
   @IsString()
   description: string;
 
-  @ApiProperty({ description: 'ราคาไอเทม (coins)', example: 100 })
+  @ApiProperty({ description: 'ราคาไอเทม (Copper)', example: 100 })
   @IsNumber()
   price: number;
 

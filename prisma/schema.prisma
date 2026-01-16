@@ -26,6 +26,7 @@ model User {
   sentTransfers Transfer[]    @relation("SentTransfers")
   receivedTransfers Transfer[] @relation("ReceivedTransfers")
   payments      Payment[]
+  coinPackPurchases CoinPackPurchase[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   Transaction   Transaction[]
@@ -71,6 +72,8 @@ model Transaction {
   gift         Gift?             @relation(fields: [giftId], references: [id])
   transferId   String?           @db.ObjectId
   transfer     Transfer?         @relation(fields: [transferId], references: [id])
+  coinPackPurchaseId String?     @db.ObjectId @unique
+  coinPackPurchase CoinPackPurchase? @relation("TransactionToCoinPackPurchase")
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -83,6 +86,7 @@ enum TransactionType {
   PURCHASE
   GIFT
   TRANSFER
+  COIN_PACK
 }
 
 enum TransactionStatus {
@@ -261,4 +265,35 @@ enum PaymentStatus {
   SUCCEEDED         // ชำระเงินสำเร็จ
   FAILED            // ล้มเหลว
   CANCELED          // ยกเลิก
+}
+
+model CoinPack {
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
+  packNumber    Int               @unique
+  price         Float             // ราคาในบาท
+  bonus         Float             // โบนัส (%)
+  baseCopper    Int               // Base Copper (×209)
+  totalCopper   Int               // Copper รวม (ปัดเต็ม)
+  isActive      Boolean           @default(true)
+  purchases     CoinPackPurchase[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@map("coin_packs")
+}
+
+model CoinPackPurchase {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String        @db.ObjectId
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coinPackId    String        @db.ObjectId
+  coinPack      CoinPack      @relation(fields: [coinPackId], references: [id])
+  amount        Float         // จำนวนเงินที่ชำระ
+  coinsReceived Float         // จำนวน coins ที่ได้รับ
+  transactionId String?       @db.ObjectId @unique
+  transaction   Transaction?  @relation("TransactionToCoinPackPurchase", fields: [transactionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("coin_pack_purchases")
 }

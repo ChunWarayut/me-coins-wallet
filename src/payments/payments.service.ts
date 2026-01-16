@@ -1,16 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef, OnModuleInit } from '@nestjs/common';
 import Stripe from 'stripe';
 import { CreatePaymentIntentDto } from './dto/create-intent.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { DiscordService } from '../discord/discord.service';
 import { createHmac } from 'crypto';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly stripe: Stripe;
   private readonly callbackSecret?: string;
+  private pollingInterval: NodeJS.Timeout | null = null;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => DiscordService))
+    private readonly discordService: DiscordService,
+  ) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) {
       throw new Error(
@@ -25,6 +31,92 @@ export class PaymentsService {
       this.logger.warn(
         'CALLBACK_SIGNATURE_SECRET is not configured; callback redirects will not be signed.',
       );
+    }
+  }
+
+  onModuleInit() {
+    // เริ่ม polling สำหรับ payment ที่ยังไม่เสร็จสิ้น
+    this.startPaymentPolling();
+  }
+
+  private startPaymentPolling() {
+    // Polling ทุก 5 วินาที
+    const pollInterval = 5000; // 5 seconds
+
+    this.logger.log(
+      `[PaymentPolling] Starting payment status polling every ${pollInterval / 1000} seconds`,
+    );
+
+    this.pollingInterval = setInterval(() => {
+      void this.pollPendingPayments();
+    }, pollInterval);
+  }
+
+  private async pollPendingPayments() {
+    try {
+      // ดึง payment ที่ยังไม่เสร็จสิ้น
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pendingPayments = await (this.prisma as any).payment.findMany({
+        where: {
+          status: {
+            notIn: ['SUCCEEDED', 'FAILED', 'CANCELED'],
+          },
+        },
+        take: 10, // จำกัดจำนวนเพื่อไม่ให้ overload
+      });
+
+      if (pendingPayments.length === 0) {
+        this.logger.debug('[PaymentPolling] No pending payments found');
+        return;
+      }
+
+      const paymentIds = pendingPayments.map(
+        (p: any) => p.stripePaymentIntentId,
+      );
+      this.logger.debug(
+        `[PaymentPolling] Checking ${pendingPayments.length} pending payments: ${paymentIds.join(', ')}`,
+      );
+
+      // ตรวจสอบสถานะของแต่ละ payment
+      for (const payment of pendingPayments) {
+        const paymentId = payment.stripePaymentIntentId;
+        this.logger.debug(
+          `[PaymentPolling] Checking payment: ${paymentId}, current status: ${payment.status}`,
+        );
+        try {
+          await this.getPaymentIntentStatus(paymentId);
+        } catch (error: any) {
+          // ถ้า payment ไม่พบใน Stripe (อาจถูกลบหรือเป็น payment เก่า)
+          if (error?.code === 'resource_missing' || error?.statusCode === 404) {
+            this.logger.warn(
+              `[PaymentPolling] Payment ${payment.stripePaymentIntentId} not found in Stripe. Marking as CANCELED.`,
+            );
+            // อัปเดตสถานะเป็น CANCELED
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (this.prisma as any).payment.update({
+                where: { stripePaymentIntentId: payment.stripePaymentIntentId },
+                data: { status: 'CANCELED' },
+              });
+              this.logger.log(
+                `[PaymentPolling] Payment ${payment.stripePaymentIntentId} marked as CANCELED`,
+              );
+            } catch (updateError) {
+              this.logger.error(
+                `[PaymentPolling] Failed to update payment ${payment.stripePaymentIntentId}:`,
+                updateError,
+              );
+            }
+          } else {
+            this.logger.error(
+              `[PaymentPolling] Error checking payment ${payment.stripePaymentIntentId}:`,
+              error,
+            );
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error('[PaymentPolling] Error polling payments:', error);
     }
   }
 
@@ -129,6 +221,9 @@ export class PaymentsService {
       });
 
       this.logger.log(`Payment record created: ${paymentIntent.id}`);
+      this.logger.log(
+        `[Payment Created] PaymentIntent ID: ${paymentIntent.id}, Status: ${paymentIntent.status}, Amount: ${paymentIntent.amount} ${paymentIntent.currency}`,
+      );
 
       // ถ้าไม่มี QR Code ให้แจ้งเตือนแต่ยังคืนค่ากลับไป
       if (!qrData && paymentIntent.status === 'requires_action') {
@@ -168,13 +263,56 @@ export class PaymentsService {
         where: { stripePaymentIntentId: paymentIntentId },
       });
 
+      if (!localPayment) {
+        this.logger.warn(
+          `[getPaymentIntentStatus] Payment ${paymentIntentId} not found in database`,
+        );
+      } else {
+        this.logger.debug(
+          `[getPaymentIntentStatus] Payment ${paymentIntentId} found in database with status: ${localPayment.status}`,
+        );
+      }
+
       // ถ้าสถานะยังไม่เสร็จสิ้น ให้ตรวจสอบจาก Stripe
       if (
         localPayment &&
         !['SUCCEEDED', 'FAILED', 'CANCELED'].includes(localPayment.status)
       ) {
-        const paymentIntent =
-          await this.stripe.paymentIntents.retrieve(paymentIntentId);
+        this.logger.log(
+          `[getPaymentIntentStatus] Checking Stripe for payment ${paymentIntentId}, current status: ${localPayment.status}`,
+        );
+        let paymentIntent;
+        try {
+          paymentIntent =
+            await this.stripe.paymentIntents.retrieve(paymentIntentId);
+          this.logger.log(
+            `[getPaymentIntentStatus] Stripe status for ${paymentIntentId}: ${paymentIntent.status}`,
+          );
+        } catch (error: any) {
+          // ถ้า payment ไม่พบใน Stripe
+          if (error?.code === 'resource_missing' || error?.statusCode === 404) {
+            this.logger.warn(
+              `Payment ${paymentIntentId} not found in Stripe. Marking as CANCELED.`,
+            );
+            // อัปเดตสถานะเป็น CANCELED
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (this.prisma as any).payment.update({
+              where: { stripePaymentIntentId: paymentIntentId },
+              data: { status: 'CANCELED' },
+            });
+            // Return status as canceled
+            return this.attachCallbackSignature({
+              id: paymentIntentId,
+              status: 'canceled',
+              amount: localPayment.amount || 0,
+              currency: localPayment.currency || 'thb',
+              description: localPayment.description || '',
+              metadata: localPayment.metadata || {},
+              qrCodeUrl: localPayment.qrCodeUrl,
+            });
+          }
+          throw error;
+        }
 
         // อัปเดตสถานะในฐานข้อมูล
         const updatedStatus = this.mapStripeStatusToPaymentStatus(
@@ -198,6 +336,20 @@ export class PaymentsService {
           
           // อัปเดต localPayment สำหรับ return
           localPayment.status = updatedStatus;
+
+          // ถ้าสถานะเปลี่ยนเป็น SUCCEEDED ให้เรียก handlePaymentSuccess
+          // (รองรับกรณีที่ webhook ไม่ trigger เช่น local development)
+          if (updatedStatus === 'SUCCEEDED') {
+            this.logger.log(
+              `[getPaymentIntentStatus] Payment succeeded, calling handlePaymentSuccess for ${paymentIntentId}`,
+            );
+            // เรียกแบบไม่ await เพื่อไม่ให้ block response
+            this.handlePaymentSuccess(paymentIntentId).catch((error) => {
+              this.logger.error(
+                `[getPaymentIntentStatus] Error in handlePaymentSuccess: ${error}`,
+              );
+            });
+          }
         }
 
         return this.attachCallbackSignature({
@@ -225,8 +377,20 @@ export class PaymentsService {
       }
 
       // ถ้าไม่มีในฐานข้อมูล ดึงจาก Stripe
-      const paymentIntent =
-        await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      let paymentIntent;
+      try {
+        paymentIntent =
+          await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      } catch (error: any) {
+        // ถ้า payment ไม่พบใน Stripe
+        if (error?.code === 'resource_missing' || error?.statusCode === 404) {
+          this.logger.warn(
+            `Payment ${paymentIntentId} not found in Stripe and not in database.`,
+          );
+          throw new Error(`Payment ${paymentIntentId} not found`);
+        }
+        throw error;
+      }
 
       return this.attachCallbackSignature({
         id: paymentIntent.id,
@@ -237,7 +401,11 @@ export class PaymentsService {
         metadata: paymentIntent.metadata,
         qrCodeUrl: null, // ไม่มี QR ถ้าดึงจาก Stripe โดยตรง
       });
-    } catch (error) {
+    } catch (error: any) {
+      // ถ้าเป็น error ที่จัดการแล้ว (payment not found) ให้ throw ต่อ
+      if (error?.message?.includes('not found')) {
+        throw error;
+      }
       this.logger.error(
         `Failed to retrieve PaymentIntent: ${paymentIntentId}`,
         error,
@@ -249,30 +417,60 @@ export class PaymentsService {
   constructWebhookEvent(rawBody: Buffer, signature: string) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
+      this.logger.error('STRIPE_WEBHOOK_SECRET is not configured');
       throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
     }
 
+    this.logger.log(`Verifying webhook signature with secret: ${webhookSecret.substring(0, 10)}...`);
+
     try {
-      return this.stripe.webhooks.constructEvent(
+      const event = this.stripe.webhooks.constructEvent(
         rawBody,
         signature,
         webhookSecret,
       );
+      this.logger.log(`Webhook signature verified successfully. Event type: ${event.type}`);
+      return event;
     } catch (error) {
       this.logger.error('Webhook signature verification failed', error);
+      this.logger.error(`Raw body length: ${rawBody.length}`);
+      this.logger.error(`Signature: ${signature.substring(0, 50)}...`);
       throw error;
     }
   }
 
   async handleWebhookEvent(event: Stripe.Event) {
     this.logger.log(`Processing webhook event: ${event.type}`);
+    this.logger.log(`Event ID: ${event.id}`);
+    this.logger.log(`Event created: ${new Date(event.created * 1000).toISOString()}`);
 
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const succeededIntent = event.data.object as Stripe.PaymentIntent;
         this.logger.log(`Payment succeeded: ${succeededIntent.id}`);
+        this.logger.log(`Payment amount: ${succeededIntent.amount} ${succeededIntent.currency}`);
+        this.logger.log(`Payment metadata: ${JSON.stringify(succeededIntent.metadata)}`);
+        
+        // ตรวจสอบว่า payment นี้ถูกสร้างจากระบบของเราหรือไม่
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingPayment = await (this.prisma as any).payment.findUnique({
+          where: { stripePaymentIntentId: succeededIntent.id },
+        });
+
+        if (!existingPayment) {
+          this.logger.warn(
+            `Payment ${succeededIntent.id} not found in database. This might be a test payment from Stripe CLI. Skipping...`,
+          );
+          break;
+        }
+
+        this.logger.log(
+          `Payment ${succeededIntent.id} found in database. Processing...`,
+        );
+        
         await this.updatePaymentStatus(succeededIntent.id, 'SUCCEEDED');
-        // TODO: เพิ่มเงินเข้า wallet หรือส่งการแจ้งเตือน
+        // อัปเดต embed และเพิ่มเงินเข้า wallet
+        await this.handlePaymentSuccess(succeededIntent.id);
         break;
       }
 
@@ -315,6 +513,18 @@ export class PaymentsService {
       | 'CANCELED',
   ) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existingPayment = await (this.prisma as any).payment.findUnique({
+        where: { stripePaymentIntentId: paymentIntentId },
+      });
+
+      if (!existingPayment) {
+        this.logger.warn(
+          `Payment record not found for: ${paymentIntentId}. This might be a test payment from Stripe CLI or a payment not created through our system.`,
+        );
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (this.prisma as any).payment.update({
         where: { stripePaymentIntentId: paymentIntentId },
@@ -394,5 +604,159 @@ export class PaymentsService {
       ...payload,
       callbackSignature: hmac,
     };
+  }
+
+  private async handlePaymentSuccess(paymentIntentId: string) {
+    try {
+      this.logger.log(`[handlePaymentSuccess] Processing payment success for: ${paymentIntentId}`);
+      
+      // ดึงข้อมูล payment จากฐานข้อมูล
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payment = await (this.prisma as any).payment.findUnique({
+        where: { stripePaymentIntentId: paymentIntentId },
+      });
+
+      this.logger.log(`[handlePaymentSuccess] Payment found: ${payment ? 'Yes' : 'No'}`);
+      
+      if (!payment) {
+        this.logger.warn(`[handlePaymentSuccess] Payment not found for: ${paymentIntentId}`);
+        return;
+      }
+
+      if (!payment.metadata) {
+        this.logger.warn(`[handlePaymentSuccess] Payment metadata is missing for: ${paymentIntentId}`);
+        return;
+      }
+
+      const metadata = payment.metadata as any;
+      this.logger.log(`[handlePaymentSuccess] Metadata: ${JSON.stringify(metadata)}`);
+      
+      const messageId = metadata.messageId;
+      const channelId = metadata.channelId;
+      const guildId = metadata.guildId;
+      const userId = metadata.userId;
+      const type = metadata.type;
+
+      this.logger.log(
+        `[handlePaymentSuccess] Extracted values: type=${type}, userId=${userId}, messageId=${messageId}, channelId=${channelId}`,
+      );
+
+      if (!messageId || !channelId) {
+        this.logger.warn(
+          `[handlePaymentSuccess] No message ID or channel ID found for payment ${paymentIntentId}. messageId: ${messageId}, channelId: ${channelId}`,
+        );
+        return;
+      }
+
+      this.logger.log(`[handlePaymentSuccess] Updating embed for message ${messageId} in channel ${channelId}`);
+
+      // อัปเดต embed ผ่าน DiscordService
+      await this.discordService.updatePaymentEmbed(
+        messageId,
+        channelId,
+        guildId,
+        payment,
+        metadata,
+      );
+      
+      this.logger.log(`[handlePaymentSuccess] Embed update completed for payment ${paymentIntentId}`);
+
+      // เพิ่มเงินเข้า wallet ถ้าเป็น coin pack หรือ topup
+      if (type === 'coin_pack' && userId) {
+        const coinsAmount = parseFloat(metadata.coinsAmount || '0');
+        this.logger.log(
+          `[handlePaymentSuccess] Processing coin_pack: userId=${userId}, coinsAmount=${coinsAmount}`,
+        );
+        if (coinsAmount > 0) {
+          this.logger.log(`[handlePaymentSuccess] Calling addCoinsToWallet for userId=${userId}, amount=${coinsAmount}`);
+          await this.addCoinsToWallet(userId, coinsAmount, paymentIntentId);
+        } else {
+          this.logger.warn(
+            `[handlePaymentSuccess] coinsAmount is 0 or invalid for payment ${paymentIntentId}`,
+          );
+        }
+      } else if (type === 'discord_topup' && userId) {
+        const paymentAmount = parseFloat(metadata.paymentAmount || '0');
+        this.logger.log(
+          `[handlePaymentSuccess] Processing discord_topup: userId=${userId}, paymentAmount=${paymentAmount}`,
+        );
+        if (paymentAmount > 0) {
+          this.logger.log(`[handlePaymentSuccess] Calling addCoinsToWallet for userId=${userId}, amount=${paymentAmount}`);
+          await this.addCoinsToWallet(userId, paymentAmount, paymentIntentId);
+        } else {
+          this.logger.warn(
+            `[handlePaymentSuccess] paymentAmount is 0 or invalid for payment ${paymentIntentId}`,
+          );
+        }
+      } else {
+        this.logger.warn(
+          `[handlePaymentSuccess] Payment type mismatch or missing userId. type=${type}, userId=${userId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to handle payment success: ${paymentIntentId}`,
+        error,
+      );
+    }
+  }
+
+  private async addCoinsToWallet(
+    userId: string,
+    amount: number,
+    paymentIntentId: string,
+  ) {
+    try {
+      this.logger.log(
+        `[addCoinsToWallet] Starting: userId=${userId}, amount=${amount}, paymentIntentId=${paymentIntentId}`,
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const user = await (this.prisma as any).user.findUnique({
+        where: { id: userId },
+        include: { wallet: true },
+      });
+
+      if (!user || !user.wallet) {
+        this.logger.warn(`[addCoinsToWallet] User or wallet not found for userId: ${userId}`);
+        return;
+      }
+
+      this.logger.log(
+        `[addCoinsToWallet] User found: ${user.id}, current balance: ${user.wallet.balance}, adding: ${amount}`,
+      );
+
+      // เพิ่มเงินเข้า wallet
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updatedWallet = await (this.prisma as any).wallet.update({
+        where: { id: user.wallet.id },
+        data: { balance: user.wallet.balance + amount },
+      });
+
+      this.logger.log(`[addCoinsToWallet] Wallet updated: new balance: ${updatedWallet.balance}`);
+
+      // สร้าง transaction record
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transaction = await (this.prisma as any).transaction.create({
+        data: {
+          amount,
+          type: 'COIN_PACK',
+          status: 'COMPLETED',
+          userId: user.id,
+          walletId: user.wallet.id,
+        },
+      });
+
+      this.logger.log(`[addCoinsToWallet] Transaction created: ${transaction.id}`);
+
+      this.logger.log(
+        `Added ${amount} coins to wallet for user ${userId} from payment ${paymentIntentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to add coins to wallet for user ${userId}`,
+        error,
+      );
+    }
   }
 }
